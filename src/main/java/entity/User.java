@@ -1,10 +1,11 @@
 package entity;
 
-import com.github.f4b6a3.ulid.UlidCreator;
+import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users")
@@ -13,9 +14,8 @@ import java.time.LocalDateTime;
 public class User {
 
     @Id
-    @NonNull
-    @Column(name = "user_id", nullable = false, length = 26)
-    private String userId;
+    @Column(name = "user_id", nullable = false, updatable = false)
+    private UUID userId = UuidCreator.getTimeOrderedEpoch();
 
     @NonNull
     @Column(name = "email", nullable = false, length = 255, unique = true)
