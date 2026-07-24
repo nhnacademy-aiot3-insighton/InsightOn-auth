@@ -37,6 +37,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,"/api/v1/auth/refresh").permitAll()
                         .anyRequest().authenticated());
 
+
         return http.build();
     }
 
