@@ -2,27 +2,29 @@ package com.nhnacademy.insightonauth.service;
 
 import com.nhnacademy.insightonauth.entity.User;
 
-import java.util.UUID;
-
 public interface UserService {
 
-    void createUser(String email, String userName, String phoneNumber);
+    void createUser(String email, String password, String userName, String phoneNumber);
 
-    User findById(UUID userId);
+    User findById(Long userId);
 
     User findByEmail(String email);
 
-    void updateUserName(UUID userId, String newUserName);
+    boolean login(String email, String password);
 
-    void updatePhoneNumber(UUID userId, String phoneNumber);
+    void updateUserName(Long userId, String newUserName);
 
-    void updateLastLoginAt(UUID userId);
+    void updatePhoneNumber(Long userId, String phoneNumber);
 
-    void activate(UUID userId);
+    void updateLastLoginAt(Long userId);
 
-    void withdraw(UUID userId);
+    void activate(Long userId);
 
-    void sleep(UUID userId);
+    void withdraw(Long userId);
 
-    void block(UUID userId);
+    void sleep(Long userId);
+
+    void block(Long userId);
+
+    void deleteUser(Long userId);
 }

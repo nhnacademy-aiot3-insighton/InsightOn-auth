@@ -1,20 +1,22 @@
 package com.nhnacademy.insightonauth.service.impl;
 
-import com.nhnacademy.insightonauth.entity.Status;
-import com.nhnacademy.insightonauth.entity.User;
+import com.nhnacademy.insightonauth.entity.*;
 import com.nhnacademy.insightonauth.exception.DuplicateEmailException;
 import com.nhnacademy.insightonauth.exception.DuplicatePhoneNumberException;
 import com.nhnacademy.insightonauth.exception.UserNotFoundException;
 import com.nhnacademy.insightonauth.repository.UserRepository;
+import com.nhnacademy.insightonauth.service.UserCredentialService;
+import com.nhnacademy.insightonauth.service.UserRoleService;
 import com.nhnacademy.insightonauth.util.PhoneNumberUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.nhnacademy.insightonauth.service.UserService;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
+import java.util.List;
 
 @Service
 @Transactional
@@ -22,9 +24,12 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final UserCredentialService userCredentialService;
+    private final UserRoleService userRoleService;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
-    public void createUser(String email, String userName, String phoneNumber) {
+    public void createUser(String email, String password, String userName, String phoneNumber) {
         if (userRepository.existsByEmail(email)) {
             throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
         }
@@ -35,13 +40,14 @@ public class UserServiceImpl implements UserService {
         }
 
         User user = new User(email, userName, normalized);
-
         userRepository.save(user);
+        userCredentialService.create(user, password);
+        userRoleService.create(user, Role.MEMBER);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public User findById(UUID userId) {
+    public User findById(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
     }
@@ -54,7 +60,22 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void updateUserName(UUID userId, String newUserName) {
+    public boolean login(String email, String password) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
+
+        UserCredential credential = userCredentialService.findByUser(user);
+        List<UserRole> userRoleList = userRoleService.findByUser(user);
+
+        if (!passwordEncoder.matches(password, credential.getPasswordHash())) {
+            throw new UserNotFoundException("이메일 또는 비밀번호가 올바르지 않습니다.");
+        }
+
+        return true;
+    }
+
+    @Override
+    public void updateUserName(Long userId, String newUserName) {
         User user = findActiveUser(userId);
 
         user.setUserName(newUserName);
@@ -62,7 +83,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void updatePhoneNumber(UUID userId, String phoneNumber) {
+    public void updatePhoneNumber(Long userId, String phoneNumber) {
         User user = findActiveUser(userId);
         String normalized = PhoneNumberUtil.normalize(phoneNumber);
 
@@ -77,13 +98,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void updateLastLoginAt(UUID userId) {
+    public void updateLastLoginAt(Long userId) {
         User user = findById(userId);
         user.setLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC));
     }
 
     @Override
-    public void activate(UUID userId) {
+    public void activate(Long userId) {
         User user = findById(userId);
 
         if (user.getStatus() == Status.WITHDRAW) {
@@ -95,7 +116,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void withdraw(UUID userId) {
+    public void withdraw(Long userId) {
         User user = findById(userId);
 
         if (user.getStatus() == Status.WITHDRAW) {
@@ -106,7 +127,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void sleep(UUID userId) {
+    public void sleep(Long userId) {
         User user = findById(userId);
 
         if (user.getStatus() == Status.SLEEP) {
@@ -118,7 +139,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void block(UUID userId) {
+    public void block(Long userId) {
         User user = findById(userId);
 
         if (user.getStatus() == Status.BLOCK) {
@@ -130,7 +151,14 @@ public class UserServiceImpl implements UserService {
         user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
     }
 
-    private User findActiveUser(UUID userId) {
+    @Override
+    public void deleteUser(Long userId) {
+        User user = findById(userId);
+
+        userRepository.delete(user);
+    }
+
+    private User findActiveUser(Long userId) {
         User user = findById(userId);
         if (user.getStatus() != Status.ACTIVE) {
             throw new IllegalStateException("정상 상태의 계정이 아닙니다.");
