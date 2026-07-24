@@ -36,4 +36,4 @@ build/
 .env
 
 ### keys ###
-keys/*
+.keys/*
