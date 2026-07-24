@@ -15,9 +15,9 @@ import java.util.UUID;
 public class User {
 
     @Id
-    @NonNull
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id", nullable = false, updatable = false)
-    private UUID userId;
+    private Long userId;
 
     @NonNull
     @Setter
@@ -57,7 +57,6 @@ public class User {
     public User(String email, String userName, String phoneNumber) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-        this.userId = UuidCreator.getTimeOrderedEpoch();
         this.email = email;
         this.userName = userName;
         this.phoneNumber = phoneNumber;
@@ -68,10 +67,11 @@ public class User {
 
     public void withdraw() {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        UUID uuid = UuidCreator.getTimeOrderedEpoch();
 
-        this.email = email + ";" + this.userId;
+        this.email = email + ";" + uuid;
         if (this.phoneNumber != null) {
-            this.phoneNumber = this.phoneNumber + ";" + this.userId;
+            this.phoneNumber = this.phoneNumber + ";" + uuid;
         }
         this.status = Status.WITHDRAW;
         this.updatedAt = now;
