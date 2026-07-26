@@ -31,4 +31,10 @@ public class UserCredentialServiceImpl implements UserCredentialService {
 
         return userCredential;
     }
+
+    @Override
+    public void updatePassword(User user, String password) {
+        UserCredential userCredential = findByUser(user);
+        userCredential.changePassword(passwordEncoder.encode(password));
+    }
 }

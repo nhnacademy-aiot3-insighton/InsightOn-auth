@@ -7,4 +7,6 @@ public interface UserCredentialService {
     void create(User user, String password);
 
     UserCredential findByUser(User user);
+
+    void updatePassword(User user, String password);
 }

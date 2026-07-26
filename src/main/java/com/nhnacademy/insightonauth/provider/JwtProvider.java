@@ -1,9 +1,12 @@
 package com.nhnacademy.insightonauth.provider;
 
+import com.nhnacademy.insightonauth.exception.InvalidRefreshTokenException;
+import com.nhnacademy.insightonauth.exception.RefreshTokenNotFoundException;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
@@ -13,34 +16,91 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
-//@Component
+@Component
 public class JwtProvider {
 
     private final PrivateKey privateKey;
     private final PublicKey publicKey;
+    private final String keyId;
+    private final Duration accessValidity;
+    private final Duration refreshValidity;
+    private final StringRedisTemplate redisTemplate;
 
     public JwtProvider(
             @Value("${jwt.private-key-path}") String privateKeyPath,
-            @Value("${jwt.public-key-path}") String publicKeyPath) throws Exception {
+            @Value("${jwt.public-key-path}") String publicKeyPath,
+            @Value("${jwt.key-id}") String keyId,
+            @Value("${jwt.access-token-validity}") Duration accessValidity,
+            @Value("${jwt.refresh-token-validity}") Duration refreshValidity,
+            StringRedisTemplate redisTemplate) throws Exception {
         this.privateKey = loadPrivateKey(privateKeyPath);
         this.publicKey = loadPublicKey(publicKeyPath);
+        this.keyId = keyId;
+        this.accessValidity = accessValidity;
+        this.refreshValidity = refreshValidity;
+        this.redisTemplate = redisTemplate;
     }
 
     public String createAccessToken(Long userId, List<String> roles) {
         Instant now = Instant.now();
         return Jwts.builder()
+                .header()
+                .keyId(keyId)
+                .and()
                 .subject(userId.toString())
                 .claim("roles", roles)
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(15, ChronoUnit.MINUTES)))
+                .expiration(Date.from(now.plus(accessValidity)))
                 .signWith(privateKey)
                 .compact();
+    }
+
+    public String createRefreshToken(Long userId, List<String> roles) {
+        Instant now = Instant.now();
+        String jti = UUID.randomUUID().toString();
+        String token = Jwts.builder()
+                .header()
+                .keyId(keyId)
+                .and()
+                .subject(userId.toString())
+                .id(jti) //jti
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plus(refreshValidity)))
+                .signWith(privateKey)
+                .compact();
+
+        redisTemplate.opsForValue().set("refresh:" + userId, jti, refreshValidity);
+        return token;
+    }
+
+    public void validateRefreshToken(Long userId, String token) {
+        //토큰 검증
+        Claims claims;
+        try {
+            claims = parse(token);
+        } catch (JwtException e) {
+            throw new InvalidRefreshTokenException("유효하지 않은 토큰 입니다.");
+        }
+        // 토큰 userId 검증
+        if (!claims.getSubject().equals(userId.toString())) {
+            throw new InvalidRefreshTokenException("토큰 소유자가 일치하지 않습니다.");
+        }
+
+        //redis 존재 검사
+        String jti = redisTemplate.opsForValue().get("refresh:" + userId);
+        if(jti == null) {
+            throw new RefreshTokenNotFoundException("토큰을 찾을 수 없습니다.");
+        }
+        if (!jti.equals(claims.getId())) {
+            throw new InvalidRefreshTokenException("유효하지 않은 토큰 입니다.");
+        }
     }
 
     public Claims parse(String token) {

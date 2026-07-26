@@ -4,6 +4,7 @@ import com.nhnacademy.insightonauth.entity.*;
 import com.nhnacademy.insightonauth.exception.DuplicateEmailException;
 import com.nhnacademy.insightonauth.exception.DuplicatePhoneNumberException;
 import com.nhnacademy.insightonauth.exception.UserNotFoundException;
+import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.UserCredentialService;
 import com.nhnacademy.insightonauth.service.UserRoleService;
@@ -27,6 +28,7 @@ public class UserServiceImpl implements UserService {
     private final UserCredentialService userCredentialService;
     private final UserRoleService userRoleService;
     private final PasswordEncoder passwordEncoder;
+    private final JwtProvider jwtProvider;
 
     @Override
     public void createUser(String email, String password, String userName, String phoneNumber) {
@@ -70,6 +72,16 @@ public class UserServiceImpl implements UserService {
         if (!passwordEncoder.matches(password, credential.getPasswordHash())) {
             throw new UserNotFoundException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
+
+        user.setLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC));
+        String accessToken = jwtProvider.createAccessToken(
+                user.getUserId(), userRoleList.stream()
+                        .map(userRole -> userRole.getRole().name())
+                        .toList());
+        String refreshToken = jwtProvider.createRefreshToken(
+                user.getUserId(), userRoleList.stream()
+                .map(userRole -> userRole.getRole().name())
+                .toList());
 
         return true;
     }
