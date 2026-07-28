@@ -2,6 +2,7 @@ package com.nhnacademy.insightonauth.controller;
 
 import com.nhnacademy.insightonauth.dto.UserLoginRequest;
 import com.nhnacademy.insightonauth.dto.UserSignupRequest;
+import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,6 @@ public class UserController {
 
     @PostMapping("/signup")
     public void doSignup(@RequestBody @Valid UserSignupRequest userSignupRequest) {
-        userService.createUser(userSignupRequest.email(), userSignupRequest.password(), userSignupRequest.userName(), userSignupRequest.phoneNumber());
+        userService.createUser(userSignupRequest.email(), userSignupRequest.password(), userSignupRequest.userName(), userSignupRequest.phoneNumber(), Role.MEMBER);
     }
 }

@@ -1,16 +1,23 @@
 package com.nhnacademy.insightonauth.service;
 
+import com.nhnacademy.insightonauth.dto.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.UserSignupResponse;
+import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.User;
 
 public interface UserService {
 
-    void createUser(String email, String password, String userName, String phoneNumber);
+    UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role);
+
+    boolean emailVerify(String email);
 
     User findById(Long userId);
 
     User findByEmail(String email);
 
-    boolean login(String email, String password);
+    UserLoginResponse login(String email, String password);
+
+    void logout(Long userId);
 
     void updateUserName(Long userId, String newUserName);
 

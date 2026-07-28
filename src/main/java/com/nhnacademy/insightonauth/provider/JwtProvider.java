@@ -2,6 +2,8 @@ package com.nhnacademy.insightonauth.provider;
 
 import com.nhnacademy.insightonauth.exception.InvalidRefreshTokenException;
 import com.nhnacademy.insightonauth.exception.RefreshTokenNotFoundException;
+import com.nhnacademy.insightonauth.redis.RedisKey;
+import com.nhnacademy.insightonauth.redis.RedisService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -31,7 +33,7 @@ public class JwtProvider {
     private final String keyId;
     private final Duration accessValidity;
     private final Duration refreshValidity;
-    private final StringRedisTemplate redisTemplate;
+    private final RedisService redisService;
 
     public JwtProvider(
             @Value("${jwt.private-key-path}") String privateKeyPath,
@@ -39,22 +41,25 @@ public class JwtProvider {
             @Value("${jwt.key-id}") String keyId,
             @Value("${jwt.access-token-validity}") Duration accessValidity,
             @Value("${jwt.refresh-token-validity}") Duration refreshValidity,
-            StringRedisTemplate redisTemplate) throws Exception {
+            StringRedisTemplate redisTemplate,
+            RedisService redisService) throws Exception {
         this.privateKey = loadPrivateKey(privateKeyPath);
         this.publicKey = loadPublicKey(publicKeyPath);
         this.keyId = keyId;
         this.accessValidity = accessValidity;
         this.refreshValidity = refreshValidity;
-        this.redisTemplate = redisTemplate;
+        this.redisService = redisService;
     }
 
     public String createAccessToken(Long userId, List<String> roles) {
         Instant now = Instant.now();
+        String jti = UUID.randomUUID().toString();
         return Jwts.builder()
                 .header()
                 .keyId(keyId)
                 .and()
                 .subject(userId.toString())
+                .id(jti) //jti
                 .claim("roles", roles)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(accessValidity)))
@@ -76,7 +81,7 @@ public class JwtProvider {
                 .signWith(privateKey)
                 .compact();
 
-        redisTemplate.opsForValue().set("refresh:" + userId, jti, refreshValidity);
+        redisService.set(RedisKey.REFRESH.getPrefix() + userId, jti, refreshValidity);
         return token;
     }
 
@@ -94,7 +99,7 @@ public class JwtProvider {
         }
 
         //redis 존재 검사
-        String jti = redisTemplate.opsForValue().get("refresh:" + userId);
+        String jti = redisService.get(RedisKey.REFRESH.getPrefix() + userId);
         if(jti == null) {
             throw new RefreshTokenNotFoundException("토큰을 찾을 수 없습니다.");
         }

@@ -1,10 +1,12 @@
 package com.nhnacademy.insightonauth.service.impl;
 
+import com.nhnacademy.insightonauth.dto.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.UserSignupResponse;
 import com.nhnacademy.insightonauth.entity.*;
-import com.nhnacademy.insightonauth.exception.DuplicateEmailException;
-import com.nhnacademy.insightonauth.exception.DuplicatePhoneNumberException;
-import com.nhnacademy.insightonauth.exception.UserNotFoundException;
+import com.nhnacademy.insightonauth.exception.*;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
+import com.nhnacademy.insightonauth.redis.RedisKey;
+import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.UserCredentialService;
 import com.nhnacademy.insightonauth.service.UserRoleService;
@@ -29,9 +31,10 @@ public class UserServiceImpl implements UserService {
     private final UserRoleService userRoleService;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
+    private final RedisService redisService;
 
     @Override
-    public void createUser(String email, String password, String userName, String phoneNumber) {
+    public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role) {
         if (userRepository.existsByEmail(email)) {
             throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
         }
@@ -44,7 +47,16 @@ public class UserServiceImpl implements UserService {
         User user = new User(email, userName, normalized);
         userRepository.save(user);
         userCredentialService.create(user, password);
-        userRoleService.create(user, Role.MEMBER);
+        userRoleService.create(user, role);
+
+        return new UserSignupResponse(user.getEmail(), user.getUserName(), user.getPhoneNumber(), user.getCreatedAt());
+    }
+
+    @Override
+    public boolean emailVerify(String email) {
+
+
+        return false;
     }
 
     @Override
@@ -62,18 +74,23 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public boolean login(String email, String password) {
+    public UserLoginResponse login(String email, String password) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
-
         UserCredential credential = userCredentialService.findByUser(user);
-        List<UserRole> userRoleList = userRoleService.findByUser(user);
 
         if (!passwordEncoder.matches(password, credential.getPasswordHash())) {
-            throw new UserNotFoundException("이메일 또는 비밀번호가 올바르지 않습니다.");
+            throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 
+        if (!user.getStatus().isLoginable()) {
+            throw new InvalidUserException(user.getStatus().getMessage());
+        }
+
+        List<UserRole> userRoleList = userRoleService.findByUser(user);
+
         user.setLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC));
+
         String accessToken = jwtProvider.createAccessToken(
                 user.getUserId(), userRoleList.stream()
                         .map(userRole -> userRole.getRole().name())
@@ -83,7 +100,14 @@ public class UserServiceImpl implements UserService {
                 .map(userRole -> userRole.getRole().name())
                 .toList());
 
-        return true;
+        return new UserLoginResponse(accessToken, refreshToken);
+    }
+
+    //front에서 access, refresh token 제거
+    //여기선 refresh만 redis에서 제거
+    @Override
+    public void logout(Long userId) {
+        redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
     }
 
     @Override
