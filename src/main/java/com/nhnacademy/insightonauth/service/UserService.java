@@ -23,6 +23,10 @@ public interface UserService {
 
     void logout(Long userId);
 
+    void reactivateRequest(String email);
+
+    UserLoginResponse reactivateConfirm(String email, String code);
+
     void updateUserName(Long userId, String newUserName);
 
     void updatePhoneNumber(Long userId, String phoneNumber);

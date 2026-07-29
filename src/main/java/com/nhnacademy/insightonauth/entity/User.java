@@ -1,6 +1,7 @@
 package com.nhnacademy.insightonauth.entity;
 
 import com.github.f4b6a3.uuid.UuidCreator;
+import com.nhnacademy.insightonauth.exception.InvalidUserStatusException;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -63,6 +64,18 @@ public class User {
         this.status = Status.ACTIVE;
         this.updatedAt = now;
         this.createdAt = now;
+    }
+
+    public void reactivate() {
+        if (this.status != Status.SLEEP) {
+            throw new InvalidUserStatusException("휴면 상태가 아닙니다.");
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        this.status = Status.ACTIVE;
+        this.updatedAt = now;
+        this.lastLoginAt = now;
     }
 
     public void withdraw() {

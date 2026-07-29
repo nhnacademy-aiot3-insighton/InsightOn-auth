@@ -1,6 +1,5 @@
 package com.nhnacademy.insightonauth.service.impl;
 
-import com.fasterxml.jackson.core.TreeCodec;
 import com.nhnacademy.insightonauth.dto.UserLoginResponse;
 import com.nhnacademy.insightonauth.dto.UserSignupResponse;
 import com.nhnacademy.insightonauth.email.EmailVerificationService;
@@ -107,22 +106,9 @@ public class UserServiceImpl implements UserService {
             throw new InvalidUserException(user.getStatus().getMessage());
         }
 
-        List<UserRole> userRoleList = userRoleService.findByUser(user);
-
         user.setLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC));
 
-        String accessToken = jwtProvider.createAccessToken(
-                user.getUserId(), userRoleList.stream()
-                        .map(userRole -> userRole.getRole().name())
-                        .toList());
-        String refreshToken = jwtProvider.createRefreshToken(
-                user.getUserId(), userRoleList.stream()
-                .map(userRole -> userRole.getRole().name())
-                .toList());
-
-        redisService.delete(RedisKey.LOGIN_LOCK.getPrefix() + email);
-        redisService.delete(RedisKey.LOGIN_FAIL.getPrefix() + email);
-        return new UserLoginResponse(accessToken, refreshToken);
+        return issueTokens(user, email);
     }
 
     //front에서 access, refresh token 제거
@@ -130,6 +116,22 @@ public class UserServiceImpl implements UserService {
     @Override
     public void logout(Long userId) {
         redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
+    }
+
+    @Override
+    public void reactivateRequest(String email) {
+        emailVerificationService.sendVerificationCode(email);
+    }
+
+    @Override
+    public UserLoginResponse reactivateConfirm(String email, String code) {
+        emailVerificationService.emailVerify(email, code);
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
+        user.reactivate();
+
+        return issueTokens(user, email);
     }
 
     @Override
@@ -166,7 +168,7 @@ public class UserServiceImpl implements UserService {
         User user = findById(userId);
 
         if (user.getStatus() == Status.WITHDRAW) {
-            throw new IllegalStateException("이미 탈퇴한 계정입니다.");
+            throw new InvalidUserStatusException("이미 탈퇴한 계정입니다.");
         }
 
         user.setStatus(Status.ACTIVE);
@@ -178,7 +180,7 @@ public class UserServiceImpl implements UserService {
         User user = findById(userId);
 
         if (user.getStatus() == Status.WITHDRAW) {
-            throw new IllegalStateException("이미 탈퇴한 계정입니다.");
+            throw new InvalidUserStatusException("이미 탈퇴한 계정입니다.");
         }
 
         user.withdraw();
@@ -189,7 +191,7 @@ public class UserServiceImpl implements UserService {
         User user = findById(userId);
 
         if (user.getStatus() == Status.SLEEP) {
-            throw new IllegalStateException("이미 휴면 상태 계정입니다.");
+            throw new InvalidUserStatusException("이미 휴면 상태 계정입니다.");
         }
 
         user.setStatus(Status.SLEEP);
@@ -201,7 +203,7 @@ public class UserServiceImpl implements UserService {
         User user = findById(userId);
 
         if (user.getStatus() == Status.BLOCK) {
-            throw new IllegalStateException("이미 정지된 계정입니다.");
+            throw new InvalidUserStatusException("이미 정지된 계정입니다.");
         }
 
 
@@ -219,7 +221,7 @@ public class UserServiceImpl implements UserService {
     private User findActiveUser(Long userId) {
         User user = findById(userId);
         if (user.getStatus() != Status.ACTIVE) {
-            throw new IllegalStateException("정상 상태의 계정이 아닙니다.");
+            throw new InvalidUserStatusException("정상 상태의 계정이 아닙니다.");
         }
         return user;
     }
@@ -236,5 +238,22 @@ public class UserServiceImpl implements UserService {
         } else {
             redisService.set(RedisKey.LOGIN_FAIL.getPrefix() + email, String.valueOf(failCount), Duration.ofMinutes(5));
         }
+    }
+
+    private UserLoginResponse issueTokens(User user, String email) {
+        List<UserRole> userRoleList = userRoleService.findByUser(user);
+
+        String accessToken = jwtProvider.createAccessToken(
+                user.getUserId(), userRoleList.stream()
+                        .map(userRole -> userRole.getRole().name())
+                        .toList());
+        String refreshToken = jwtProvider.createRefreshToken(
+                user.getUserId(), userRoleList.stream()
+                        .map(userRole -> userRole.getRole().name())
+                        .toList());
+
+        redisService.delete(RedisKey.LOGIN_LOCK.getPrefix() + email);
+        redisService.delete(RedisKey.LOGIN_FAIL.getPrefix() + email);
+        return new UserLoginResponse(accessToken, refreshToken);
     }
 }
