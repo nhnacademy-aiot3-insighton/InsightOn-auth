@@ -7,9 +7,13 @@ import com.nhnacademy.insightonauth.entity.User;
 
 public interface UserService {
 
-    UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role);
+    UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken);
 
-    boolean emailVerify(String email);
+    boolean checkEmailAvailable(String email);
+
+    void emailVerifyRequest(String email);
+
+    String emailVerifyConfirm(String email, String code);
 
     User findById(Long userId);
 

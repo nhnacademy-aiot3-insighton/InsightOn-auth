@@ -27,10 +27,13 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(EndpointRequest.to("health")).permitAll()
-                        .requestMatchers("/h2-console/**").permitAll()
-                        .requestMatchers("/api/v1/auth/login").permitAll()
-                        .requestMatchers("/api/v1/auth/signup").permitAll()
-                        .requestMatchers(HttpMethod.POST,"/api/v1/auth/refresh").permitAll()
+                        .requestMatchers("/h2-console/**",
+                                "/api/v1/auth/email/verify-request",
+                                "/api/v1/auth/email/verify-confirm",
+                                "/api/v1/auth/check-email",
+                                "/api/v1/auth/signup",
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/refresh").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/users/me/**").authenticated()
                         .anyRequest().authenticated());

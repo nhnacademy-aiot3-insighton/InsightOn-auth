@@ -1,7 +1,9 @@
 package com.nhnacademy.insightonauth.service.impl;
 
+import com.fasterxml.jackson.core.TreeCodec;
 import com.nhnacademy.insightonauth.dto.UserLoginResponse;
 import com.nhnacademy.insightonauth.dto.UserSignupResponse;
+import com.nhnacademy.insightonauth.email.EmailVerificationService;
 import com.nhnacademy.insightonauth.entity.*;
 import com.nhnacademy.insightonauth.exception.*;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.nhnacademy.insightonauth.service.UserService;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -32,12 +35,14 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final RedisService redisService;
+    private final EmailVerificationService emailVerificationService;
 
     @Override
-    public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role) {
+    public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken) {
         if (userRepository.existsByEmail(email)) {
             throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
         }
+        emailVerificationService.emailVerifyCheck(email, verificationToken);
 
         String normalized = PhoneNumberUtil.normalize(phoneNumber);
         if (normalized != null && userRepository.existsByPhoneNumber(normalized)) {
@@ -53,10 +58,18 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public boolean emailVerify(String email) {
+    public boolean checkEmailAvailable(String email) {
+        return !userRepository.existsByEmail(email);
+    }
 
+    @Override
+    public void emailVerifyRequest(String email) {
+        emailVerificationService.sendVerificationCode(email);
+    }
 
-        return false;
+    @Override
+    public String emailVerifyConfirm(String email, String code) {
+        return emailVerificationService.emailVerify(email, code);
     }
 
     @Override
@@ -75,11 +88,18 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserLoginResponse login(String email, String password) {
+        // 로그인 계정 lock 확인
+        if (redisService.hasKey(RedisKey.LOGIN_LOCK.getPrefix() + email)) {
+            throw new LoginTemporarilyLockedException("5회 연속 로그인 실패로 5분간 잠겼습니다.");
+        }
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
         UserCredential credential = userCredentialService.findByUser(user);
 
+        // password 확인
         if (!passwordEncoder.matches(password, credential.getPasswordHash())) {
+            increaseFailCount(email); // 로그인 실패 카운트
             throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 
@@ -100,6 +120,8 @@ public class UserServiceImpl implements UserService {
                 .map(userRole -> userRole.getRole().name())
                 .toList());
 
+        redisService.delete(RedisKey.LOGIN_LOCK.getPrefix() + email);
+        redisService.delete(RedisKey.LOGIN_FAIL.getPrefix() + email);
         return new UserLoginResponse(accessToken, refreshToken);
     }
 
@@ -200,5 +222,19 @@ public class UserServiceImpl implements UserService {
             throw new IllegalStateException("정상 상태의 계정이 아닙니다.");
         }
         return user;
+    }
+
+    private void increaseFailCount(String email) {
+        String savedFailCount = redisService.get(RedisKey.LOGIN_FAIL.getPrefix() + email);
+        int failCount = savedFailCount == null || savedFailCount.isBlank() ? 0 : Integer.parseInt(savedFailCount);
+        failCount++;
+
+        if (failCount >= 5) {
+            redisService.delete(RedisKey.LOGIN_FAIL.getPrefix() + email);
+            redisService.set(RedisKey.LOGIN_LOCK.getPrefix() + email, String.valueOf(failCount), Duration.ofMinutes(5));
+            throw new LoginTemporarilyLockedException("5회 연속 로그인 실패로 5분간 잠겼습니다.");
+        } else {
+            redisService.set(RedisKey.LOGIN_FAIL.getPrefix() + email, String.valueOf(failCount), Duration.ofMinutes(5));
+        }
     }
 }

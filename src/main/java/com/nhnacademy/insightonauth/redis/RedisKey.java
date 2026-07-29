@@ -2,8 +2,10 @@ package com.nhnacademy.insightonauth.redis;
 
 public enum RedisKey {
     REFRESH("refresh:"),
+    VERIFIED("verified:"),
     VERIFY("verify:"),
     LOGIN_FAIL("login-fail:"),
+    LOGIN_LOCK("login-lock:"),
     BLACKLIST("blacklist:");
 
     private final String prefix;

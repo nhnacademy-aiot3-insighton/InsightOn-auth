@@ -108,11 +108,11 @@ public class JwtProvider {
         }
     }
 
-    public Claims parse(String token) {
+    private Claims parse(String token) {
         return Jwts.parser()
-                .verifyWith(publicKey)
-                .build()
-                .parseSignedClaims(token)
+                .verifyWith(publicKey)  // public key로 검증 설정
+                .build()                // parser 완성
+                .parseSignedClaims(token)   // 토큰 검증
                 .getPayload();
     }
 
