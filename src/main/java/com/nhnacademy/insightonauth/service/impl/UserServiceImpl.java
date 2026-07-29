@@ -158,6 +158,27 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public String findMaskedEmail(String userName, String phoneNumber) {
+        User user = userRepository.findByUserNameAndPhoneNumber(userName, phoneNumber)
+                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
+
+        String email = user.getEmail();
+
+        int atIndex = email.indexOf('@');
+        String local = email.substring(0, atIndex);
+        String domain = email.substring(atIndex);
+
+        int visibleLength = Math.min(2, local.length() - 1);   // 최소 1글자는 가려지도록
+        visibleLength = Math.max(visibleLength, 1);            // 1글자짜리도 앞 1글자는 노출
+
+        // 2글자만 노출 그외 전부 마스킹
+        String visible = local.substring(0, visibleLength);
+        String masked = "*".repeat(local.length() - visibleLength);
+
+        return visible + masked + domain;
+    }
+
+    @Override
     public void updateLastLoginAt(Long userId) {
         User user = findById(userId);
         user.setLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC));
