@@ -2,6 +2,7 @@ package com.nhnacademy.insightonauth.email;
 
 import com.nhnacademy.insightonauth.exception.EmailSendException;
 import com.nhnacademy.insightonauth.exception.InvalidVerificationCodeException;
+import com.nhnacademy.insightonauth.exception.InvalidVerificationTokenException;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import jakarta.mail.MessagingException;
@@ -19,7 +20,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class EmailVerificationService {
+public class EmailService {
 
     private final JavaMailSender javaMailSender;
     private final RedisService redisService;
@@ -31,6 +32,7 @@ public class EmailVerificationService {
     private String fromName;
 
 
+    // 이메일 확인 코드 발송
     public void sendVerificationCode(String email) {
         // 6자리 암호화 난수 인증코드 생성
         String code = String.format("%06d", new SecureRandom().nextInt(1_000_000));
@@ -41,6 +43,20 @@ public class EmailVerificationService {
         // 메일 발송
         send(email, "[InsightOn] 이메일 인증 코드",
                 "인증 코드: " + code + "\n5분 이내에 입력해 주세요.");
+    }
+
+    // 비밀번호 재설정 경로 발성
+    public void sendPasswordResetPath(String email) {
+        String uuid = UUID.randomUUID().toString();
+        // 재설정 경로
+        String path = "https://insighton.store/password/reset?token=" + uuid;
+
+        // Redis에 저장 (10분 TTL)
+        redisService.set(RedisKey.PASSWORD_RESET.getPrefix() + uuid, email, Duration.ofMinutes(10));
+
+        // 메일 발송
+        send(email, "[InsightOn] 비밀번호 재설정",
+                "비밀번호 재설정 경로: " + path + "\n10분 이내에 수정해 주세요.");
     }
 
     private void send(String to, String subject, String text) {
@@ -54,10 +70,11 @@ public class EmailVerificationService {
 
             javaMailSender.send(message);
         } catch (MessagingException | UnsupportedEncodingException e) {
-            throw new EmailSendException("이메일 발송에 실패했습니다.");
+            throw new EmailSendException("이메일 발송에 실패했습니다.", e);
         }
     }
 
+    // 이메일 확인 코드 확인
     public String emailVerify(String email, String inputCode) {
         String savedCode = redisService.get(RedisKey.VERIFY.getPrefix() + email);
 
@@ -78,6 +95,7 @@ public class EmailVerificationService {
         return verificationToken;
     }
 
+    // 회원가입시 최종 확인된 이메일인지 다시 확인
     public boolean emailVerifyCheck(String email, String inputToken) {
         String savedToken = redisService.get(RedisKey.VERIFIED.getPrefix() + email);
 
@@ -87,5 +105,17 @@ public class EmailVerificationService {
 
         redisService.delete(RedisKey.VERIFIED.getPrefix() + email);
         return true;
+    }
+
+    public String emailTokenVerify(String token) {
+        String savedEmail = redisService.get(RedisKey.PASSWORD_RESET.getPrefix() + token);
+
+        // 토큰 만료 또는 존재하지 않는 토큰
+        if (savedEmail == null || savedEmail.isBlank()) {
+            throw new InvalidVerificationTokenException("인증 토큰이 올바르지 않거나 만료되었습니다.");
+        }
+
+        redisService.delete(RedisKey.PASSWORD_RESET.getPrefix() + token);
+        return savedEmail;
     }
 }

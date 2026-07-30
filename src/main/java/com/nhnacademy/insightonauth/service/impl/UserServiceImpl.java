@@ -2,7 +2,7 @@ package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.dto.UserLoginResponse;
 import com.nhnacademy.insightonauth.dto.UserSignupResponse;
-import com.nhnacademy.insightonauth.email.EmailVerificationService;
+import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.*;
 import com.nhnacademy.insightonauth.exception.*;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
@@ -34,14 +34,14 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final RedisService redisService;
-    private final EmailVerificationService emailVerificationService;
+    private final EmailService emailService;
 
     @Override
     public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken) {
         if (userRepository.existsByEmail(email)) {
             throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
         }
-        emailVerificationService.emailVerifyCheck(email, verificationToken);
+        emailService.emailVerifyCheck(email, verificationToken);
 
         String normalized = PhoneNumberUtil.normalize(phoneNumber);
         if (normalized != null && userRepository.existsByPhoneNumber(normalized)) {
@@ -63,12 +63,12 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void emailVerifyRequest(String email) {
-        emailVerificationService.sendVerificationCode(email);
+        emailService.sendVerificationCode(email);
     }
 
     @Override
     public String emailVerifyConfirm(String email, String code) {
-        return emailVerificationService.emailVerify(email, code);
+        return emailService.emailVerify(email, code);
     }
 
     @Override
@@ -120,18 +120,41 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void reactivateRequest(String email) {
-        emailVerificationService.sendVerificationCode(email);
+        emailService.sendVerificationCode(email);
     }
 
     @Override
     public UserLoginResponse reactivateConfirm(String email, String code) {
-        emailVerificationService.emailVerify(email, code);
+        emailService.emailVerify(email, code);
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
         user.reactivate();
 
         return issueTokens(user, email);
+    }
+
+    @Override
+    public void passwordResetRequest(String email) {
+        // 탈퇴 계정은 메일이 나가지 않게 조정, 예외를 던지면 공격자가 계정 존재를 알 수 있음
+        userRepository.findByEmail(email).ifPresent(user -> {
+            if (user.getStatus() == Status.WITHDRAW) {
+                return;
+            }
+            emailService.sendPasswordResetPath(email);
+        });
+    }
+
+    @Override
+    public void passwordResetConfirm(String token, String newPassword) {
+        String email = emailService.emailTokenVerify(token);
+
+        User user = findByEmail(email);
+        UserCredential userCredential = userCredentialService.findByUser(user);
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        userCredential.changePassword(now, newPassword);
+        user.setUpdatedAt(now);
     }
 
     @Override

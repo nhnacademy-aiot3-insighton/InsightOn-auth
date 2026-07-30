@@ -27,6 +27,10 @@ public interface UserService {
 
     UserLoginResponse reactivateConfirm(String email, String code);
 
+    void passwordResetRequest(String email);
+
+    void passwordResetConfirm(String token, String newPassword);
+
     void updateUserName(Long userId, String newUserName);
 
     void updatePhoneNumber(Long userId, String phoneNumber);
