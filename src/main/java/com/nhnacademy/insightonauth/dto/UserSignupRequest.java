@@ -29,7 +29,10 @@ public record UserSignupRequest(
 
         @Size(max = 20, message = "전화번호는 20자를 초과할 수 없습니다.")
         @Pattern(regexp = "^[0-9-]*$", message = "전화번호 형식이 올바르지 않습니다.")
-        String phoneNumber
+        String phoneNumber,
+
+        @NotBlank(message = "토큰은 필수입니다.")
+        String token
 ) {
     public UserSignupRequest {
         if (email != null) {

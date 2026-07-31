@@ -74,7 +74,7 @@ public class EmailService {
         }
     }
 
-    // 이메일 확인 코드 확인
+    // 이메일 코드 확인
     public String emailVerify(String email, String inputCode) {
         String savedCode = redisService.get(RedisKey.VERIFY.getPrefix() + email);
 

@@ -150,10 +150,9 @@ public class UserServiceImpl implements UserService {
         String email = emailService.emailTokenVerify(token);
 
         User user = findByEmail(email);
-        UserCredential userCredential = userCredentialService.findByUser(user);
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        userCredential.changePassword(now, newPassword);
+        userCredentialService.updatePassword(now, user, newPassword);
         user.setUpdatedAt(now);
     }
 

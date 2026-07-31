@@ -27,13 +27,20 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(EndpointRequest.to("health")).permitAll()
-                        .requestMatchers("/h2-console/**",
+                        .requestMatchers(
+                                "/h2-console/**",
                                 "/api/v1/auth/email/verify-request",
                                 "/api/v1/auth/email/verify-confirm",
                                 "/api/v1/auth/check-email",
                                 "/api/v1/auth/signup",
                                 "/api/v1/auth/login",
-                                "/api/v1/auth/refresh").permitAll()
+                                "/api/v1/auth/refresh",
+                                "/api/v1/auth/restore",
+                                "/api/v1/auth/reactivate/email-verify-request",
+                                "/api/v1/auth/reactivate/email-verify-confirm",
+                                "/api/v1/auth/find-email",
+                                "/api/v1/auth/password/reset-request",
+                                "/api/v1/auth/password/reset-confirm").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/users/me/**").authenticated()
                         .anyRequest().authenticated());
@@ -41,22 +48,6 @@ public class SecurityConfig {
 
         return http.build();
     }
-
-//    @Bean
-//    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-//        http.csrf(AbstractHttpConfigurer::disable)
-//                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-//                .formLogin(AbstractHttpConfigurer::disable)
-//                .httpBasic(AbstractHttpConfigurer::disable)
-//                .authorizeHttpRequests(auth -> auth
-//                        .requestMatchers(EndpointRequest.to("health")).permitAll()
-//                        .requestMatchers(HttpMethod.POST,"/api/v1/auth/login").permitAll()
-//                        .requestMatchers(HttpMethod.POST,"/api/v1/auth/signup").permitAll()
-//                        .requestMatchers(HttpMethod.POST,"/api/v1/auth/refresh").permitAll()
-//                        .anyRequest().authenticated());
-//
-//        return http.build();
-//    }
 
     @Bean
     PasswordEncoder passwordEncoder() {

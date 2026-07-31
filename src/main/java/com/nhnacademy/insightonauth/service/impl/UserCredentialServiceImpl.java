@@ -10,6 +10,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -33,8 +36,8 @@ public class UserCredentialServiceImpl implements UserCredentialService {
     }
 
     @Override
-    public void updatePassword(User user, String password) {
+    public void updatePassword(OffsetDateTime now, User user, String password) {
         UserCredential userCredential = findByUser(user);
-        userCredential.changePassword(passwordEncoder.encode(password));
+        userCredential.changePassword(now, passwordEncoder.encode(password));
     }
 }
