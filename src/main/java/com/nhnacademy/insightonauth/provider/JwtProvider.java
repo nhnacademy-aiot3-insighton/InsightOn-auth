@@ -11,8 +11,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -36,15 +34,15 @@ public class JwtProvider {
     private final RedisService redisService;
 
     public JwtProvider(
-            @Value("${jwt.private-key-path}") String privateKeyPath,
-            @Value("${jwt.public-key-path}") String publicKeyPath,
+            @Value("${jwt.private-key}") String privateKeyBase64,
+            @Value("${jwt.public-key}") String publicKeyBase64,
             @Value("${jwt.key-id}") String keyId,
             @Value("${jwt.access-token-validity}") Duration accessValidity,
             @Value("${jwt.refresh-token-validity}") Duration refreshValidity,
             StringRedisTemplate redisTemplate,
             RedisService redisService) throws Exception {
-        this.privateKey = loadPrivateKey(privateKeyPath);
-        this.publicKey = loadPublicKey(publicKeyPath);
+        this.privateKey = loadPrivateKey(privateKeyBase64);
+        this.publicKey = loadPublicKey(publicKeyBase64);
         this.keyId = keyId;
         this.accessValidity = accessValidity;
         this.refreshValidity = refreshValidity;
@@ -116,9 +114,10 @@ public class JwtProvider {
                 .getPayload();
     }
 
-    private PrivateKey loadPrivateKey(String path) throws Exception {
-        String pem = Files.readString(Path.of(path));
-        String content = pem
+    private PrivateKey loadPrivateKey(String base64Key) throws Exception {
+        String pemText = new String(Base64.getDecoder().decode(base64Key));
+
+        String content = pemText
                 .replace("-----BEGIN PRIVATE KEY-----", "")
                 .replace("-----END PRIVATE KEY-----", "")
                 .replaceAll("\\s", "");
@@ -127,9 +126,10 @@ public class JwtProvider {
                 .generatePrivate(new PKCS8EncodedKeySpec(decoded));
     }
 
-    private PublicKey loadPublicKey(String path) throws Exception {
-        String pem = Files.readString(Path.of(path));
-        String content = pem
+    private PublicKey loadPublicKey(String base64Key) throws Exception {
+        String pemText = new String(Base64.getDecoder().decode(base64Key));
+
+        String content = pemText
                 .replace("-----BEGIN PUBLIC KEY-----", "")
                 .replace("-----END PUBLIC KEY-----", "")
                 .replaceAll("\\s", "");

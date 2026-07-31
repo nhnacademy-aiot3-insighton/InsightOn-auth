@@ -22,7 +22,7 @@ Content-Type: application/json
 
 {
   "email": "eunsun565@gmail.com",
-  "code": "396803"
+  "code": "994898"
 }
 
 ### 4. 회원가입
@@ -35,7 +35,7 @@ Content-Type: application/json
   "password": "eunsun565@",
   "userName": "은선",
   "phoneNumber": "010-1234-5678",
-  "token": "2df78d65-21f3-41e6-ae56-008a7a76289c"
+  "token": "ef224efa-cd39-4e5c-b7e6-ba59592a5d30"
 }
 
 ### 5. 로그인 (가입 확인용)
