@@ -3,6 +3,7 @@ package com.nhnacademy.insightonauth.email;
 import com.nhnacademy.insightonauth.exception.EmailSendException;
 import com.nhnacademy.insightonauth.exception.InvalidVerificationCodeException;
 import com.nhnacademy.insightonauth.exception.InvalidVerificationTokenException;
+import com.nhnacademy.insightonauth.exception.VerificationTemporarilyLockedException;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import jakarta.mail.MessagingException;
@@ -76,18 +77,19 @@ public class EmailService {
 
     // 이메일 코드 확인
     public String emailVerify(String email, String inputCode) {
+        if (redisService.hasKey(RedisKey.VERIFY_FAIL_LOCK.getPrefix() + email)) {
+            throw new VerificationTemporarilyLockedException("인증 시도가 5회 초과되어 5분간 잠겼습니다.");
+        }
+
         String savedCode = redisService.get(RedisKey.VERIFY.getPrefix() + email);
 
-        if (savedCode == null) {
+        if (savedCode == null || !savedCode.equals(inputCode)) {
             // 만료되었거나 애초에 요청한 적 없음
+            increaseVerifyFailCount(email);
             throw new InvalidVerificationCodeException("인증 코드가 올바르지 않거나 만료되었습니다.");
         }
-
-        boolean codeCheck = savedCode.equals(inputCode);
-        if (!codeCheck) {
-            // 코드 불일치
-            throw new InvalidVerificationCodeException("인증 코드가 올바르지 않거나 만료되었습니다.");
-        }
+        redisService.delete(RedisKey.VERIFY_FAIL.getPrefix() + email);
+        redisService.delete(RedisKey.VERIFY.getPrefix() + email);
 
         String verificationToken = UUID.randomUUID().toString();
         redisService.set(RedisKey.VERIFIED.getPrefix() + email, verificationToken, Duration.ofMinutes(15));
@@ -117,5 +119,19 @@ public class EmailService {
 
         redisService.delete(RedisKey.PASSWORD_RESET.getPrefix() + token);
         return savedEmail;
+    }
+
+    private void increaseVerifyFailCount(String email) {
+        String saved = redisService.get(RedisKey.VERIFY_FAIL.getPrefix() + email);
+        int failCount = (saved == null || saved.isBlank()) ? 0 : Integer.parseInt(saved);
+        failCount++;
+
+        if (failCount >= 5) {
+            redisService.delete(RedisKey.VERIFY_FAIL.getPrefix() + email);
+            redisService.set(RedisKey.VERIFY_FAIL_LOCK.getPrefix() + email, "locked", Duration.ofMinutes(5));
+            throw new VerificationTemporarilyLockedException("인증 시도가 5회 초과되어 5분간 잠겼습니다.");
+        } else {
+            redisService.set(RedisKey.VERIFY_FAIL.getPrefix() + email, String.valueOf(failCount), Duration.ofMinutes(5));
+        }
     }
 }
