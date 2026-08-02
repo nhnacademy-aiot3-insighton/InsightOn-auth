@@ -1,0 +1,102 @@
+package com.nhnacademy.insightonauth.service.impl;
+
+import com.nhnacademy.insightonauth.dto.AdminFindUsersResponse;
+import com.nhnacademy.insightonauth.dto.AdminUserDetailResponse;
+import com.nhnacademy.insightonauth.entity.Role;
+import com.nhnacademy.insightonauth.entity.Status;
+import com.nhnacademy.insightonauth.entity.User;
+import com.nhnacademy.insightonauth.entity.UserRole;
+import com.nhnacademy.insightonauth.redis.RedisKey;
+import com.nhnacademy.insightonauth.redis.RedisService;
+import com.nhnacademy.insightonauth.repository.UserRepository;
+import com.nhnacademy.insightonauth.service.AdminUserService;
+import com.nhnacademy.insightonauth.service.UserRoleService;
+import com.nhnacademy.insightonauth.service.UserService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class AdminUserServiceImpl implements AdminUserService {
+
+    private final UserRepository userRepository;
+    private final UserService userService;
+    private final UserRoleService userRoleService;
+    private final RedisService redisService;
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<AdminFindUsersResponse> findUsers(
+            String email, String userName, Status status, Pageable pageable) {
+
+        String emailCond = (email != null) ? email : "";
+        String userNameCond = (userName != null) ? userName : "";
+
+        Page<User> users;
+        if (status != null) {
+            users = userRepository.findByEmailContainingAndUserNameContainingAndStatus(
+                    emailCond, userNameCond, status, pageable);
+        } else {
+            users = userRepository.findByEmailContainingAndUserNameContaining(
+                    emailCond, userNameCond, pageable);
+        }
+
+        return users.map(user -> new AdminFindUsersResponse(
+                user.getUserId(), user.getEmail(), user.getUserName(),
+                user.getStatus(), user.getCreatedAt()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminUserDetailResponse findUserDetail(Long userId) {
+        User user = userService.findById(userId);
+        List<UserRole> userRoleList = userRoleService.findByUser(user);
+
+        List<Role> roles = userRoleList.stream()
+                .map(UserRole::getRole)
+                .toList();
+
+        return new AdminUserDetailResponse(
+                user.getUserId(), user.getEmail(), user.getUserName(), user.getStatus(), roles);
+    }
+
+    @Override
+    public void changeStatus(Long userId, Status status) {
+        User user = userService.findById(userId);   // 여기도 UserService 경유
+        user.setStatus(status);
+        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+
+        // BLOCK 이면 현재 refresh를 삭제
+        if (status == Status.BLOCK) {
+            redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
+        }
+    }
+
+    @Override
+    public void addUserRole(Long userId, Role role) {
+        User user = userService.findById(userId);
+        userRoleService.addRole(user, role);
+    }
+
+    @Override
+    public void removeUserRole(Long userId, Role role) {
+        User user = userService.findById(userId);
+        userRoleService.removeRole(user, role);
+    }
+
+    // 관리자가 계정 삭제는 의논을 해보자
+    @Override
+    public void deleteUser(Long userId) {
+        User user = userService.findById(userId);
+        userRepository.delete(user);
+    }
+
+}

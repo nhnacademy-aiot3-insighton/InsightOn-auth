@@ -106,7 +106,7 @@ public class JwtProvider {
         }
     }
 
-    private Claims parse(String token) {
+    public Claims parse(String token) {
         return Jwts.parser()
                 .verifyWith(publicKey)  // public key로 검증 설정
                 .build()                // parser 완성
