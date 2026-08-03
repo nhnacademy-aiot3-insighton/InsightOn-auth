@@ -51,4 +51,10 @@ public class UserRoleServiceImpl implements UserRoleService {
 
         return userRoleList;
     }
+
+    @Override
+    public void deleteUserRole(User user) {
+        List<UserRole> userRoleList = userRoleRepository.findByUser(user);
+        userRoleRepository.deleteAll(userRoleList);
+    }
 }

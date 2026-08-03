@@ -48,4 +48,6 @@ public interface UserService {
     void block(Long userId);
 
     void deleteUser(Long userId);
+
+    UserLoginResponse oauthLogin(String provider, String code);
 }

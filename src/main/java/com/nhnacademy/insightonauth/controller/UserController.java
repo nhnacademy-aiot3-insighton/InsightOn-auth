@@ -109,4 +109,13 @@ public class UserController {
 
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/oauth/{provider}")
+    public ResponseEntity<ApiResponse<UserLoginResponse>> oauthLogin(
+            @PathVariable String provider,
+            @RequestBody @Valid OauthLoginRequest request) {
+
+        UserLoginResponse response = userService.oauthLogin(provider, request.code());
+        return ResponseEntity.ok(new ApiResponse<>(response));
+    }
 }

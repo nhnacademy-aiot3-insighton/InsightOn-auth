@@ -36,8 +36,20 @@ public class UserCredentialServiceImpl implements UserCredentialService {
     }
 
     @Override
+    public void delete(User user) {
+        UserCredential userCredential = findByUser(user);
+
+        userCredentialRepository.delete(userCredential);
+    }
+
+    @Override
     public void updatePassword(OffsetDateTime now, User user, String password) {
         UserCredential userCredential = findByUser(user);
         userCredential.changePassword(now, passwordEncoder.encode(password));
+    }
+
+    @Override
+    public boolean exists(User user) {
+        return userCredentialRepository.existsByUser(user);
     }
 }

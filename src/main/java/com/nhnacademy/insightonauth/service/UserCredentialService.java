@@ -10,5 +10,9 @@ public interface UserCredentialService {
 
     UserCredential findByUser(User user);
 
+    void delete(User user);
+
     void updatePassword(OffsetDateTime now, User user, String password);
+
+    boolean exists(User user);
 }

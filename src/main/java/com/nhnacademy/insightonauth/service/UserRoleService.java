@@ -15,4 +15,6 @@ public interface UserRoleService {
     void removeRole(User user, Role role);
 
     List<UserRole> findByUser(User user);
+
+    void deleteUserRole(User user);
 }
