@@ -1,9 +1,7 @@
 package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.client.OauthClient;
-import com.nhnacademy.insightonauth.dto.OauthUserInfo;
-import com.nhnacademy.insightonauth.dto.UserLoginResponse;
-import com.nhnacademy.insightonauth.dto.UserSignupResponse;
+import com.nhnacademy.insightonauth.dto.*;
 import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.*;
 import com.nhnacademy.insightonauth.exception.*;
@@ -307,6 +305,43 @@ public class UserServiceImpl implements UserService {
         oauthService.create(newUser, provider, userInfo.providerId());
 
         return issueTokens(newUser, userInfo.email());
+    }
+
+    @Override
+    public MyInfoResponse findMyInfo(Long userId) {
+        User user = findById(userId);
+
+        return new MyInfoResponse(user.getEmail(), user.getUserName(), user.getPhoneNumber(), user.getCreatedAt());
+    }
+
+    @Override
+    public void updatePassword(Long userId, String currentPassword, String newPassword) {
+        User user = findById(userId);
+        UserCredential userCredential = userCredentialService.findByUser(user);
+
+        if (!passwordEncoder.matches(currentPassword, userCredential.getPasswordHash())) {
+            throw new InvalidCredentialsException("기존 비밀번호가 올바르지 않습니다.");
+        }
+
+        userCredentialService.updatePassword(OffsetDateTime.now(ZoneOffset.UTC), user, newPassword);
+    }
+
+    @Override
+    public List<RoleResponse> findMyRoles(Long userId) {
+        User user = findById(userId);
+
+        return userRoleService.findByUser(user).stream()
+                .map(userRole -> new RoleResponse(userRole.getRole()))
+                .toList();
+    }
+
+    @Override
+    public List<OauthResponse> findMyOauths(Long userId) {
+        User user = findById(userId);
+
+        return oauthService.findAllByUser(user).stream()
+                .map(userOauth -> new OauthResponse(userOauth.getOauthId(), userOauth.getProvider()))
+                .toList();
     }
 
     private User findActiveUser(Long userId) {

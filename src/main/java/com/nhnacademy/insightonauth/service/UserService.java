@@ -1,9 +1,10 @@
 package com.nhnacademy.insightonauth.service;
 
-import com.nhnacademy.insightonauth.dto.UserLoginResponse;
-import com.nhnacademy.insightonauth.dto.UserSignupResponse;
+import com.nhnacademy.insightonauth.dto.*;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.User;
+
+import java.util.List;
 
 public interface UserService {
 
@@ -50,4 +51,12 @@ public interface UserService {
     void deleteUser(Long userId);
 
     UserLoginResponse oauthLogin(String provider, String code);
+
+    MyInfoResponse findMyInfo(Long userId);
+
+    void updatePassword(Long userId, String currentPassword, String newPassword);
+
+    List<RoleResponse> findMyRoles(Long userId);
+
+    List<OauthResponse> findMyOauths(Long userId);
 }
