@@ -4,6 +4,7 @@ import com.nhnacademy.insightonauth.entity.Oauth;
 import com.nhnacademy.insightonauth.entity.User;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface OauthService {
 
@@ -16,4 +17,6 @@ public interface OauthService {
     Oauth findOauth(User user, String provider);
 
     List<Oauth> findAllByUser(User user);
+
+    Optional<Oauth> findByProviderAndProviderUserId(String provider, String providerUserId);
 }

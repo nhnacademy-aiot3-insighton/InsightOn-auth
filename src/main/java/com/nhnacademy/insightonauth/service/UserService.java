@@ -59,4 +59,6 @@ public interface UserService {
     List<RoleResponse> findMyRoles(Long userId);
 
     List<OauthResponse> findMyOauths(Long userId);
+
+    void linkOauth(Long userId, String provider, String code);
 }

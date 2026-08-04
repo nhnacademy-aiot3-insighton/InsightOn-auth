@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @Transactional
@@ -32,6 +33,10 @@ public class OauthServiceImpl implements OauthService {
     public void delete(User user, Long oauthId) {
         Oauth oauth = oauthRepository.findById(oauthId)
                 .orElseThrow(() -> new OauthNotFoundException("oauth를 찾을 수 없습니다."));
+
+        if (!oauth.getUser().getUserId().equals(user.getUserId())) {
+            throw new OauthNotFoundException("oauth를 찾을 수 없습니다.");
+        }
 
         boolean hasPassword = userCredentialService.exists(user);
         long oauthCount = oauthRepository.countByUser(user);
@@ -59,5 +64,10 @@ public class OauthServiceImpl implements OauthService {
     @Override
     public List<Oauth> findAllByUser(User user) {
         return oauthRepository.findByUser(user);
+    }
+
+    @Override
+    public Optional<Oauth> findByProviderAndProviderUserId(String provider, String providerUserId) {
+        return oauthRepository.findByProviderAndProviderUserId(provider, providerUserId);
     }
 }

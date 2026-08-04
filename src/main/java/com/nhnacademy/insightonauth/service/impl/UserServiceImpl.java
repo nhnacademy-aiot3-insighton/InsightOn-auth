@@ -97,8 +97,9 @@ public class UserServiceImpl implements UserService {
             throw new LoginTemporarilyLockedException("5회 연속 로그인 실패로 5분간 잠겼습니다.");
         }
 
+        // 유저 계정 존재 여부 숨기기
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new InvalidCredentialsException("유저를 찾을 수 없습니다."));
         UserCredential credential = userCredentialService.findByUser(user);
 
         // password 확인
@@ -284,21 +285,25 @@ public class UserServiceImpl implements UserService {
     public UserLoginResponse oauthLogin(String provider, String code) {
         OauthUserInfo userInfo = oauthClient.getUserInfo(provider, code);
 
-        // 1. 활성 계정 조회
-        Optional<User> activeUser = userRepository.findByEmail(userInfo.email());
-        if (activeUser.isPresent()) {
-            return issueTokens(activeUser.get(), userInfo.email());
+        Optional<Oauth> existingOauth = oauthService.findByProviderAndProviderUserId(provider, userInfo.providerId());
+
+        if (existingOauth.isPresent()) {
+            User user = existingOauth.get().getUser();
+            // 탈퇴 상태 체크
+            if (user.getStatus() == Status.WITHDRAW) {
+                if (isWithinRestorePeriod(user)) {
+                    return handleWithdrawnLogin(user);
+                }
+                throw new RestorePeriodExpiredException("탈퇴 복구 가능 기간(7일)이 지났습니다.");
+            }
+
+            if (!user.getStatus().isLoginable()) {
+                throw new InvalidUserException(user.getStatus().getMessage());
+            }
+
+            return issueTokens(user, user.getEmail());
         }
 
-        // 2. 탈퇴 계정 조회 (복구 가능 여부 판단)
-        Optional<User> withdrawnUser = userRepository
-                .findByEmailStartingWithAndStatus(userInfo.email() + ";", Status.WITHDRAW);
-
-        if (withdrawnUser.isPresent() && isWithinRestorePeriod(withdrawnUser.get())) {
-            return handleWithdrawnLogin(withdrawnUser.get());
-        }
-
-        // 3. 신규 가입 (탈퇴 이력이 없거나, 있어도 복구 기간이 지난 경우)
         User newUser = new User(userInfo.email(), userInfo.name(), null);
         userRepository.save(newUser);
         userRoleService.create(newUser, Role.MEMBER);
@@ -342,6 +347,21 @@ public class UserServiceImpl implements UserService {
         return oauthService.findAllByUser(user).stream()
                 .map(userOauth -> new OauthResponse(userOauth.getOauthId(), userOauth.getProvider()))
                 .toList();
+    }
+
+    @Override
+    public void linkOauth(Long userId, String provider, String code) {
+        User user = findById(userId);   // 이미 로그인된 그 사람
+
+        OauthUserInfo userInfo = oauthClient.getUserInfo(provider, code);   // Google 검증
+
+        // 이 소셜 계정이 이미 다른 사람 것인지 확인 (중요!)
+        oauthService.findByProviderAndProviderUserId(provider, userInfo.providerId())
+                .ifPresent(existing -> {
+                    throw new OauthAlreadyLinkedException("이미 연동된 소셜 계정입니다.");
+                });
+
+        oauthService.create(user, provider, userInfo.providerId());
     }
 
     private User findActiveUser(Long userId) {
