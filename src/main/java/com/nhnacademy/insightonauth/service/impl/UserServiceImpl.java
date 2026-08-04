@@ -276,6 +276,8 @@ public class UserServiceImpl implements UserService {
         userRoleService.deleteUserRole(user);
         // 비밀번호 삭제
         userCredentialService.delete(user);
+        // oauth 삭제
+        oauthService.deleteAllByUser(user);
         // 유저 삭제
         userRepository.delete(user);
     }

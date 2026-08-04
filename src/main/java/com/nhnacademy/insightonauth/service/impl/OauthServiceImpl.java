@@ -27,6 +27,7 @@ public class OauthServiceImpl implements OauthService {
         oauthRepository.save(oauth);
     }
 
+    // 연동 삭제
     @Override
     public void delete(User user, Long oauthId) {
         Oauth oauth = oauthRepository.findById(oauthId)
@@ -44,11 +45,17 @@ public class OauthServiceImpl implements OauthService {
     }
 
     @Override
+    public void deleteAllByUser(User user) {
+        oauthRepository.deleteByUser(user);
+    }
+
+    @Override
     public Oauth findOauth(User user, String provider) {
         return oauthRepository.findByUserAndProvider(user, provider)
                 .orElseThrow(() -> new OauthNotFoundException("연동된 소셜 계정을 찾을 수 없습니다."));
     }
 
+    // 전체 삭제
     @Override
     public List<Oauth> findAllByUser(User user) {
         return oauthRepository.findByUser(user);

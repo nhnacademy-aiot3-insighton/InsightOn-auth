@@ -14,4 +14,6 @@ public interface OauthRepository extends JpaRepository<Oauth, Long> {
     List<Oauth> findByUser(User user);
 
     Long countByUser(User user);
+
+    void deleteByUser(User user);
 }

@@ -67,11 +67,20 @@ public class User {
     }
 
     public void reactivate() {
-        if (this.status != Status.SLEEP) {
-            throw new InvalidUserStatusException("휴면 상태가 아닙니다.");
+        if (this.status != Status.SLEEP && this.status != Status.WITHDRAW) {
+            throw new InvalidUserStatusException("휴면 또는 탈퇴 상태가 아닙니다.");
         }
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // 탈퇴 상태였다면, 이메일/전화번호 복원도 필요
+        if (this.status == Status.WITHDRAW) {
+            this.email = this.email.split(";")[0];
+            if (this.phoneNumber != null) {
+                this.phoneNumber = this.phoneNumber.split(";")[0];
+            }
+            this.withdrawnAt = null;
+        }
 
         this.status = Status.ACTIVE;
         this.updatedAt = now;
