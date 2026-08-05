@@ -1,6 +1,8 @@
 package com.nhnacademy.insightonauth.controller;
 
 import com.nhnacademy.insightonauth.dto.*;
+import com.nhnacademy.insightonauth.dto.auth.*;
+import com.nhnacademy.insightonauth.dto.oauth.OauthLoginRequest;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.service.UserService;
 import jakarta.validation.Valid;
@@ -43,7 +45,8 @@ public class UserController {
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<ApiResponse<UserSignupResponse>> doSignup(@RequestBody @Valid UserSignupRequest userSignupRequest) {
+    public ResponseEntity<ApiResponse<UserSignupResponse>> doSignup(
+            @RequestBody @Valid UserSignupRequest userSignupRequest) {
         UserSignupResponse userSignupResponse =
                 userService.createUser(userSignupRequest.email(),
                     userSignupRequest.password(),
@@ -57,7 +60,8 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<UserLoginResponse>> doLogin(@RequestBody @Valid UserLoginRequest userLoginRequest) {
+    public ResponseEntity<ApiResponse<UserLoginResponse>> doLogin(
+            @RequestBody @Valid UserLoginRequest userLoginRequest) {
         UserLoginResponse userLoginResponse = userService.login(userLoginRequest.email(), userLoginRequest.password());
 
         return ResponseEntity.ok(new ApiResponse<>(userLoginResponse));
@@ -69,10 +73,12 @@ public class UserController {
 
         return ResponseEntity.noContent().build();
     }
+    @PostMapping("/reactive")
+    public ResponseEntity<ApiResponse<UserLoginResponse>> userReactive(
+            @RequestBody @Valid ReactiveRequest request) {
 
-    @PostMapping("/restore")
-    public void userRestore() {
-
+        UserLoginResponse response = userService.reactive(request.reactiveToken());
+        return ResponseEntity.ok(new ApiResponse<>(response));
     }
 
     @PostMapping("/reactivate/email-verify-request")
@@ -117,5 +123,14 @@ public class UserController {
 
         UserLoginResponse response = userService.oauthLogin(provider, request.code());
         return ResponseEntity.ok(new ApiResponse<>(response));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<TokenRefreshResponse>> refresh(
+            @RequestHeader(name = X_USER_ID) @Valid Long userId,
+            @CookieValue("refreshToken") String refreshToken) {
+        TokenRefreshResponse tokenRefreshResponse = userService.refresh(userId, refreshToken);
+
+        return ResponseEntity.ok(new ApiResponse<>(tokenRefreshResponse));
     }
 }

@@ -1,8 +1,9 @@
 package com.nhnacademy.insightonauth.filter;
 
-import com.nhnacademy.insightonauth.provider.JwtProvider;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
+import com.nhnacademy.insightonauth.entity.User;
+import com.nhnacademy.insightonauth.entity.UserRole;
+import com.nhnacademy.insightonauth.service.UserRoleService;
+import com.nhnacademy.insightonauth.service.UserService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,43 +16,36 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@Transactional
 public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 
-    private final JwtProvider jwtProvider;
+    private final UserService userService;
+    private final UserRoleService userRoleService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        String authHeader = request.getHeader("Authorization");
+        String userIdHeader = request.getHeader("X-User-Id");
 
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
+        if (userIdHeader != null) {
+            Long userId = Long.valueOf(userIdHeader);
 
-            try {
-                Claims claims = jwtProvider.parse(token);
-                Long userId = Long.valueOf(claims.getSubject());
+            User user = userService.findById(userId);
+            List<UserRole> userRoles = userRoleService.findByUser(user);
+            List<GrantedAuthority> authorities = userRoles.stream()
+                    .map(userRole -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + userRole.getRole().name()))
+                    .toList();
 
-                @SuppressWarnings("unchecked")
-                List<String> roles = claims.get("roles", List.class);
-
-                List<GrantedAuthority> authorities = roles.stream()
-                        .map(r -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + r))
-                        .collect(Collectors.toList());
-
-                Authentication auth = new UsernamePasswordAuthenticationToken(userId, null, authorities);
-                SecurityContextHolder.getContext().setAuthentication(auth);
-            } catch (JwtException e) {
-                log.debug("유효하지 않은 토큰: {}", e.getMessage());
-            }
+            Authentication auth = new UsernamePasswordAuthenticationToken(userId, null, authorities);
+            SecurityContextHolder.getContext().setAuthentication(auth);
         }
 
         filterChain.doFilter(request, response);

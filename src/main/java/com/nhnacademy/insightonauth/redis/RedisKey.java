@@ -9,7 +9,7 @@ public enum RedisKey {
     LOGIN_FAIL("login-fail:"),
     LOGIN_LOCK("login-lock:"),
     PASSWORD_RESET("password-reset:"),
-    RESTORE("restore:"),
+    REACTIVE("reactive:"),
     BLACKLIST("blacklist:");
 
     private final String prefix;

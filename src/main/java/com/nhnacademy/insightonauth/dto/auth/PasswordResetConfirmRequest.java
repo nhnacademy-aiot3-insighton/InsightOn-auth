@@ -1,4 +1,4 @@
-package com.nhnacademy.insightonauth.dto;
+package com.nhnacademy.insightonauth.dto.auth;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

@@ -1,7 +1,13 @@
 package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.client.OauthClient;
-import com.nhnacademy.insightonauth.dto.*;
+import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
+import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
+import com.nhnacademy.insightonauth.dto.mypage.RoleResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
+import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
+import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.*;
 import com.nhnacademy.insightonauth.exception.*;
@@ -13,6 +19,7 @@ import com.nhnacademy.insightonauth.service.OauthService;
 import com.nhnacademy.insightonauth.service.UserCredentialService;
 import com.nhnacademy.insightonauth.service.UserRoleService;
 import com.nhnacademy.insightonauth.util.PhoneNumberUtil;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -145,6 +152,21 @@ public class UserServiceImpl implements UserService {
         user.reactivate();
 
         return issueTokens(user, email);
+    }
+
+    @Override
+    public UserLoginResponse reactive(String reactiveToken) {
+        String userIdStr = redisService.get(RedisKey.REACTIVE.getPrefix() + reactiveToken);
+        if (userIdStr == null) {
+            throw new InvalidReactiveTokenException("복구 요청이 유효하지 않거나 만료되었습니다.");
+        }
+
+        User user = findById(Long.valueOf(userIdStr));
+        user.reactivate();   // 상태를 ACTIVE로, 이메일 원복
+
+        redisService.delete(RedisKey.REACTIVE.getPrefix() + reactiveToken);
+
+        return issueTokens(user, user.getEmail());
     }
 
     @Override
@@ -364,6 +386,28 @@ public class UserServiceImpl implements UserService {
         oauthService.create(user, provider, userInfo.providerId());
     }
 
+    @Override
+    public TokenRefreshResponse refresh(Long userId, String refreshToken) {
+        try {
+            jwtProvider.validateRefreshToken(userId, refreshToken);   // Redis의 jti와 대조 검증
+        } catch (JwtException e) {
+            throw new InvalidRefreshTokenException("유효하지 않은 토큰입니다.");
+        }
+
+        User user = findById(userId);
+        if (!user.getStatus().isLoginable()) {
+            throw new InvalidUserException(user.getStatus().getMessage());
+        }
+
+        List<String> roles = findMyRoles(userId).stream()
+                .map(roleResponse -> roleResponse.role().name())
+                .toList();
+
+        String accessToken = jwtProvider.createAccessToken(userId, roles);
+
+        return new TokenRefreshResponse(accessToken);
+    }
+
     private User findActiveUser(Long userId) {
         User user = findById(userId);
         if (user.getStatus() != Status.ACTIVE) {
@@ -410,7 +454,7 @@ public class UserServiceImpl implements UserService {
 
     private UserLoginResponse handleWithdrawnLogin(User user) {
         String restoreToken = UUID.randomUUID().toString();
-        redisService.set(RedisKey.RESTORE.getPrefix() + restoreToken,
+        redisService.set(RedisKey.REACTIVE.getPrefix() + restoreToken,
                 user.getUserId().toString(), Duration.ofMinutes(10));
 
         return UserLoginResponse.pendingRestore(restoreToken);

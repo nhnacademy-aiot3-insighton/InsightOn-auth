@@ -1,4 +1,4 @@
-package com.nhnacademy.insightonauth.dto;
+package com.nhnacademy.insightonauth.dto.oauth;
 
 public record OauthUserInfo(
         String email,

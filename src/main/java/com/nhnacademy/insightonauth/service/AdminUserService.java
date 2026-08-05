@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.service;
 
-import com.nhnacademy.insightonauth.dto.AdminFindUsersResponse;
-import com.nhnacademy.insightonauth.dto.AdminUserDetailResponse;
+import com.nhnacademy.insightonauth.dto.admin.AdminFindUsersResponse;
+import com.nhnacademy.insightonauth.dto.admin.AdminUserDetailResponse;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
 import org.springframework.data.domain.Page;

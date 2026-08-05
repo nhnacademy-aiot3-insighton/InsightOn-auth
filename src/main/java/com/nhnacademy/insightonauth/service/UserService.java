@@ -1,6 +1,11 @@
 package com.nhnacademy.insightonauth.service;
 
-import com.nhnacademy.insightonauth.dto.*;
+import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
+import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
+import com.nhnacademy.insightonauth.dto.mypage.RoleResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
+import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.User;
 
@@ -27,6 +32,8 @@ public interface UserService {
     void reactivateRequest(String email);
 
     UserLoginResponse reactivateConfirm(String email, String code);
+
+    UserLoginResponse reactive(String restoreToken);
 
     void passwordResetRequest(String email);
 
@@ -61,4 +68,6 @@ public interface UserService {
     List<OauthResponse> findMyOauths(Long userId);
 
     void linkOauth(Long userId, String provider, String code);
+
+    TokenRefreshResponse refresh(Long userId, String refreshToken);
 }

@@ -1,6 +1,6 @@
 package com.nhnacademy.insightonauth.client;
 
-import com.nhnacademy.insightonauth.dto.OauthUserInfo;
+import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;

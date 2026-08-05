@@ -1,4 +1,4 @@
-package com.nhnacademy.insightonauth.dto;
+package com.nhnacademy.insightonauth.dto.admin;
 
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;

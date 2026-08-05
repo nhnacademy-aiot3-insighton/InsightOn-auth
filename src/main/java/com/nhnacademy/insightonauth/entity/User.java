@@ -73,7 +73,7 @@ public class User {
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-        // 탈퇴 상태였다면, 이메일/전화번호 복원도 필요
+        // 탈퇴 상태였다면, 이메일/전화번호 복원
         if (this.status == Status.WITHDRAW) {
             this.email = this.email.split(";")[0];
             if (this.phoneNumber != null) {
