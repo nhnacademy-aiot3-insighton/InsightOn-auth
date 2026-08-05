@@ -20,5 +20,7 @@ public interface AdminUserService {
 
     void removeUserRole(Long userId, Role role);
 
+    void forceLogout(Long userId);
+
     void deleteUser(Long userId);
 }
