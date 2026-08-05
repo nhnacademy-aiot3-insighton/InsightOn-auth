@@ -29,6 +29,8 @@ public interface UserService {
 
     void logout(Long userId);
 
+    void forceLogout(Long userId);
+
     void reactivateRequest(String email);
 
     UserLoginResponse reactivateConfirm(String email, String code);
@@ -58,16 +60,6 @@ public interface UserService {
     void deleteUser(Long userId);
 
     UserLoginResponse oauthLogin(String provider, String code);
-
-    MyInfoResponse findMyInfo(Long userId);
-
-    void updatePassword(Long userId, String currentPassword, String newPassword);
-
-    List<RoleResponse> findMyRoles(Long userId);
-
-    List<OauthResponse> findMyOauths(Long userId);
-
-    void linkOauth(Long userId, String provider, String code);
 
     TokenRefreshResponse refresh(Long userId, String refreshToken);
 }

@@ -92,7 +92,12 @@ public class AdminUserServiceImpl implements AdminUserService {
         userRoleService.removeRole(user, role);
     }
 
-    // 관리자가 계정 삭제는 의논을 해보자
+    @Override
+    public void forceLogout(Long userId) {
+        userService.forceLogout(userId);
+    }
+
+    // 관리자가 계정 삭제
     @Override
     public void deleteUser(Long userId) {
         User user = userService.findById(userId);
