@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class UserController {
 
-    private static final String X_USER_ID = "X-USER-ID";
+    private static final String X_USER_ID = "X-User-Id";
 
     private final UserService userService;
 

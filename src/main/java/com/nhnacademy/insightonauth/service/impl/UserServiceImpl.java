@@ -2,11 +2,8 @@ package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
-import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
-import com.nhnacademy.insightonauth.dto.mypage.RoleResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
-import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.*;
@@ -15,16 +12,13 @@ import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.repository.UserRepository;
-import com.nhnacademy.insightonauth.service.OauthService;
-import com.nhnacademy.insightonauth.service.UserCredentialService;
-import com.nhnacademy.insightonauth.service.UserRoleService;
+import com.nhnacademy.insightonauth.service.*;
 import com.nhnacademy.insightonauth.util.PhoneNumberUtil;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.nhnacademy.insightonauth.service.UserService;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -139,6 +133,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public void forceLogout(Long userId) {
+        redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
+    }
+
+    @Override
     public void reactivateRequest(String email) {
         emailService.sendVerificationCode(email);
     }
@@ -216,7 +215,9 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public String findMaskedEmail(String userName, String phoneNumber) {
-        User user = userRepository.findByUserNameAndPhoneNumber(userName, phoneNumber)
+        String normalized = PhoneNumberUtil.normalize(phoneNumber);
+
+        User user = userRepository.findByUserNameAndPhoneNumber(userName, normalized)
                 .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
 
         String email = user.getEmail();
@@ -335,58 +336,6 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public MyInfoResponse findMyInfo(Long userId) {
-        User user = findById(userId);
-
-        return new MyInfoResponse(user.getEmail(), user.getUserName(), user.getPhoneNumber(), user.getCreatedAt());
-    }
-
-    @Override
-    public void updatePassword(Long userId, String currentPassword, String newPassword) {
-        User user = findById(userId);
-        UserCredential userCredential = userCredentialService.findByUser(user);
-
-        if (!passwordEncoder.matches(currentPassword, userCredential.getPasswordHash())) {
-            throw new InvalidCredentialsException("기존 비밀번호가 올바르지 않습니다.");
-        }
-
-        userCredentialService.updatePassword(OffsetDateTime.now(ZoneOffset.UTC), user, newPassword);
-    }
-
-    @Override
-    public List<RoleResponse> findMyRoles(Long userId) {
-        User user = findById(userId);
-
-        return userRoleService.findByUser(user).stream()
-                .map(userRole -> new RoleResponse(userRole.getRole()))
-                .toList();
-    }
-
-    @Override
-    public List<OauthResponse> findMyOauths(Long userId) {
-        User user = findById(userId);
-
-        return oauthService.findAllByUser(user).stream()
-                .map(userOauth -> new OauthResponse(userOauth.getOauthId(), userOauth.getProvider()))
-                .toList();
-    }
-
-    @Override
-    public void linkOauth(Long userId, String provider, String code) {
-        User user = findById(userId);   // 이미 로그인된 그 사람
-
-        OauthUserInfo userInfo = oauthClient.getUserInfo(provider, code);   // Google 검증
-
-        // 이 소셜 계정이 이미 다른 사람 것인지 확인 (중요!)
-        oauthService.findByProviderAndProviderUserId(provider, userInfo.providerId())
-                .ifPresent(existing -> {
-                    throw new OauthAlreadyLinkedException("이미 연동된 소셜 계정입니다.");
-                });
-
-        oauthService.create(user, provider, userInfo.providerId());
-    }
-
-    @Override
     public TokenRefreshResponse refresh(Long userId, String refreshToken) {
         try {
             jwtProvider.validateRefreshToken(userId, refreshToken);   // Redis의 jti와 대조 검증
@@ -399,8 +348,8 @@ public class UserServiceImpl implements UserService {
             throw new InvalidUserException(user.getStatus().getMessage());
         }
 
-        List<String> roles = findMyRoles(userId).stream()
-                .map(roleResponse -> roleResponse.role().name())
+        List<String> roles = userRoleService.findByUser(user).stream()
+                .map(userRole -> userRole.getRole().name())
                 .toList();
 
         String accessToken = jwtProvider.createAccessToken(userId, roles);

@@ -8,8 +8,8 @@ import com.nhnacademy.insightonauth.dto.mypage.MyInfoUpdateRequest;
 import com.nhnacademy.insightonauth.dto.oauth.OauthLoginRequest;
 import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
 import com.nhnacademy.insightonauth.entity.User;
+import com.nhnacademy.insightonauth.service.MyPageService;
 import com.nhnacademy.insightonauth.service.OauthService;
-import com.nhnacademy.insightonauth.service.UserRoleService;
 import com.nhnacademy.insightonauth.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,17 +24,18 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MypageController {
 
-    private static final String X_USER_ID = "X-USER-ID";
+    private static final String X_USER_ID = "X-User-Id";
 
     private final UserService userService;
     private final OauthService oauthService;
+    private final MyPageService myPageService;
 
     // 내 정보 조회
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<MyInfoResponse>> findMyInfo(
             @RequestHeader(name = X_USER_ID) @Valid Long userId) {
 
-        MyInfoResponse response = userService.findMyInfo(userId);
+        MyInfoResponse response = myPageService.findMyInfo(userId);
         return ResponseEntity.ok(new ApiResponse<>(response));
     }
 
@@ -62,7 +63,7 @@ public class MypageController {
             @RequestHeader(name = X_USER_ID) @Valid Long userId,
             @RequestBody @Valid PasswordChangeRequest request) {
 
-        userService.updatePassword(userId, request.currentPassword(), request.newPassword());
+        myPageService.updatePassword(userId, request.currentPassword(), request.newPassword());
         return ResponseEntity.ok().build();
     }
 
@@ -71,7 +72,7 @@ public class MypageController {
     public ResponseEntity<ApiResponse<List<RoleResponse>>> findMyRoles(
             @RequestHeader(name = X_USER_ID) @Valid Long userId) {
 
-        List<RoleResponse> response = userService.findMyRoles(userId);
+        List<RoleResponse> response = myPageService.findMyRoles(userId);
         return ResponseEntity.ok(new ApiResponse<>(response));
     }
 
@@ -80,7 +81,7 @@ public class MypageController {
     public ResponseEntity<ApiResponse<List<OauthResponse>>> findMyOauths(
             @RequestHeader(name = X_USER_ID) @Valid Long userId) {
 
-        List<OauthResponse> response = userService.findMyOauths(userId);
+        List<OauthResponse> response = myPageService.findMyOauths(userId);
         return ResponseEntity.ok(new ApiResponse<>(response));
     }
 
@@ -91,7 +92,7 @@ public class MypageController {
             @PathVariable String provider,
             @RequestBody @Valid OauthLoginRequest request) {
 
-        userService.linkOauth(userId, provider, request.code());
+        myPageService.linkOauth(userId, provider, request.code());
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 

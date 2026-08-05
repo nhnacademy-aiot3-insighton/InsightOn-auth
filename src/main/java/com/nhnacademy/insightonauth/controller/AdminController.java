@@ -68,10 +68,10 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
-    // 강제 로그아웃은 안 만드는게 맞지 않나
-//    @PostMapping("/users/{userId}/force-logout")
-//    public ResponseEntity<Void> forceLogout(@PathVariable Long userId) {
-//        adminUserService.forceLogout(userId);
-//        return ResponseEntity.noContent().build();
-//    }
+    // 강제 로그아웃
+    @PostMapping("/users/{userId}/force-logout")
+    public ResponseEntity<Void> forceLogout(@PathVariable Long userId) {
+        adminUserService.forceLogout(userId);
+        return ResponseEntity.noContent().build();
+    }
 }

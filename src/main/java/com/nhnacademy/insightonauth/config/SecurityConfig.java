@@ -39,7 +39,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/signup",
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh",
-                                "/api/v1/auth/restore",
+                                "/api/v1/auth/reactive",
                                 "/api/v1/auth/reactivate/email-verify-request",
                                 "/api/v1/auth/reactivate/email-verify-confirm",
                                 "/api/v1/auth/find-email",
