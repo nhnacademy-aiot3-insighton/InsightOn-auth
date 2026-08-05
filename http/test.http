@@ -1,19 +1,48 @@
-### 회원가입
+### 1. 이메일 중복 확인
+POST http://localhost:8080/api/v1/auth/check-email
+Content-Type: application/json
+
+{
+  "email": "eunsun565@gmail.com"
+}
+
+### 2. 이메일 인증코드 발송
+POST http://localhost:8080/api/v1/auth/email/verify-request
+Content-Type: application/json
+
+{
+  "email": "eunsun565@gmail.com"
+}
+
+### 3. 이메일 인증코드 확인
+### -> MailHog(http://localhost:8025)에서 받은 6자리 코드를 code 값에 넣고 실행
+### -> 응답으로 받은 verificationToken을 복사해서 4번 요청에 사용
+POST http://localhost:8080/api/v1/auth/email/verify-confirm
+Content-Type: application/json
+
+{
+  "email": "eunsun565@gmail.com",
+  "code": "994898"
+}
+
+### 4. 회원가입
+### -> 위 3번 응답의 verificationToken 값을 token 필드에 넣고 실행
 POST http://localhost:8080/api/v1/auth/signup
 Content-Type: application/json
 
 {
-  "email": "test@example.com",
-  "password": "test1234!",
-  "userName": "test",
-  "phoneNumber": "01012345678"
+  "email": "eunsun565@gmail.com",
+  "password": "eunsun565@",
+  "userName": "은선",
+  "phoneNumber": "010-1234-5678",
+  "token": "ef224efa-cd39-4e5c-b7e6-ba59592a5d30"
 }
 
-### 로그인
+### 5. 로그인 (가입 확인용)
 POST http://localhost:8080/api/v1/auth/login
 Content-Type: application/json
 
 {
-  "email": "test@example.com",
-  "password": "test1234!"
+  "email": "eunsun565@gmail.com",
+  "password": "eunsun565@"
 }

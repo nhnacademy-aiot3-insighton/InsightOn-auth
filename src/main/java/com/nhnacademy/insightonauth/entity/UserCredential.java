@@ -46,8 +46,8 @@ public class UserCredential {
         this.createdAt = now;
     }
 
-    public void changePassword(String newPasswordHash) {
+    public void changePassword(OffsetDateTime now, String newPasswordHash) {
         this.passwordHash = newPasswordHash;
-        this.updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        this.updatedAt = now;
     }
 }

@@ -1,20 +1,49 @@
 package com.nhnacademy.insightonauth.service;
 
+import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
+import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
+import com.nhnacademy.insightonauth.dto.mypage.RoleResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
+import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
+import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.User;
+
+import java.util.List;
 
 public interface UserService {
 
-    void createUser(String email, String password, String userName, String phoneNumber);
+    UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken);
+
+    boolean checkEmailAvailable(String email);
+
+    void emailVerifyRequest(String email);
+
+    String emailVerifyConfirm(String email, String code);
 
     User findById(Long userId);
 
     User findByEmail(String email);
 
-    boolean login(String email, String password);
+    UserLoginResponse login(String email, String password);
+
+    void logout(Long userId);
+
+    void reactivateRequest(String email);
+
+    UserLoginResponse reactivateConfirm(String email, String code);
+
+    UserLoginResponse reactive(String restoreToken);
+
+    void passwordResetRequest(String email);
+
+    void passwordResetConfirm(String token, String newPassword);
 
     void updateUserName(Long userId, String newUserName);
 
     void updatePhoneNumber(Long userId, String phoneNumber);
+
+    String findMaskedEmail(String userName, String phoneNumber);
 
     void updateLastLoginAt(Long userId);
 
@@ -27,4 +56,18 @@ public interface UserService {
     void block(Long userId);
 
     void deleteUser(Long userId);
+
+    UserLoginResponse oauthLogin(String provider, String code);
+
+    MyInfoResponse findMyInfo(Long userId);
+
+    void updatePassword(Long userId, String currentPassword, String newPassword);
+
+    List<RoleResponse> findMyRoles(Long userId);
+
+    List<OauthResponse> findMyOauths(Long userId);
+
+    void linkOauth(Long userId, String provider, String code);
+
+    TokenRefreshResponse refresh(Long userId, String refreshToken);
 }
