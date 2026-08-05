@@ -36,7 +36,7 @@ Content-Type: application/json
   "password": "Test1234!",
   "userName": "홍길동",
   "phoneNumber": "010-1234-5678",
-  "token": "609befd5-9359-441c-9b6d-a9598f8d190c"
+  "token": "token"
 }
 
 ### 1-5. 로그인
@@ -74,7 +74,7 @@ POST http://localhost:8080/api/v1/auth/password/reset-confirm
 Content-Type: application/json
 
 {
-  "token": "fa187b39-bb38-4a4e-bf82-602a00409780",
+  "token": "token",
   "password": "NewPassword1234!"
 }
 
