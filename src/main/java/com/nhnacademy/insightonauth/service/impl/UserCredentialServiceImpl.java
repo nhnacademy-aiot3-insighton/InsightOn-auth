@@ -10,6 +10,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -30,5 +33,23 @@ public class UserCredentialServiceImpl implements UserCredentialService {
                 .orElseThrow(() -> new UserCredentialsNotFoundException("유저 인증 정보가 없습니다."));
 
         return userCredential;
+    }
+
+    @Override
+    public void delete(User user) {
+        UserCredential userCredential = findByUser(user);
+
+        userCredentialRepository.delete(userCredential);
+    }
+
+    @Override
+    public void updatePassword(OffsetDateTime now, User user, String password) {
+        UserCredential userCredential = findByUser(user);
+        userCredential.changePassword(now, passwordEncoder.encode(password));
+    }
+
+    @Override
+    public boolean exists(User user) {
+        return userCredentialRepository.existsByUser(user);
     }
 }
