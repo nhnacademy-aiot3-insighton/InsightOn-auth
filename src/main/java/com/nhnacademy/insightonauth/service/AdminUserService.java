@@ -22,5 +22,7 @@ public interface AdminUserService {
 
     void forceLogout(Long userId);
 
+    // 강제 삭제시 유저가 group 관리자인 경우 생각
+    // group 관리를 넣는게 어떤가
     void deleteUser(Long userId);
 }
