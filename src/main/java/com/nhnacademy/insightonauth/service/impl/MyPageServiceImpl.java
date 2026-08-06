@@ -43,6 +43,7 @@ public class MyPageServiceImpl implements MyPageService {
         User user = userService.findById(userId);
         UserCredential userCredential = userCredentialService.findByUser(user);
 
+        // 공부해오기
         if (!passwordEncoder.matches(currentPassword, userCredential.getPasswordHash())) {
             throw new InvalidCredentialsException("기존 비밀번호가 올바르지 않습니다.");
         }
