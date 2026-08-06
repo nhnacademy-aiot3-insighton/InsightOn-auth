@@ -1,9 +1,11 @@
 package com.nhnacademy.insightonauth.service.impl;
 
+import com.nhnacademy.insightonauth.client.CoreClient;
 import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
+import com.nhnacademy.insightonauth.dto.core.ManagerGroupExistsResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.*;
@@ -16,6 +18,7 @@ import com.nhnacademy.insightonauth.service.*;
 import com.nhnacademy.insightonauth.util.PhoneNumberUtil;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +30,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -41,6 +45,7 @@ public class UserServiceImpl implements UserService {
     private final EmailService emailService;
     private final OauthClient oauthClient;
     private final OauthService oauthService;
+    private final CoreClient coreClient;
 
     @Override
     public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken) {
@@ -262,7 +267,21 @@ public class UserServiceImpl implements UserService {
             throw new InvalidUserStatusException("이미 탈퇴한 계정입니다.");
         }
 
+        ManagerGroupExistsResponse response;
+        try {
+            response = coreClient.existsManagerGroup(userId);
+        } catch (Exception e) {
+            log.warn("Core 서비스 호출 실패로 탈퇴를 차단합니다 - userId: {}, 원인: {}", userId, e.getMessage());
+            throw new CoreServiceUnavailableException(
+                    "일시적으로 그룹 정보를 확인할 수 없어 탈퇴가 제한됩니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        if (response.exists()) {
+            throw new ManagerGroupExistsException("그룹 관리자 역할이 있어 탈퇴할 수 없습니다.");
+        }
+
         user.withdraw();
+        redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
     }
 
     @Override
@@ -355,6 +374,20 @@ public class UserServiceImpl implements UserService {
         String accessToken = jwtProvider.createAccessToken(userId, roles);
 
         return new TokenRefreshResponse(accessToken);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findExpiredWithdrawnUsers() {
+        return userRepository.findByStatusAndWithdrawnAtBefore(
+                Status.WITHDRAW, OffsetDateTime.now(ZoneOffset.UTC).minusDays(90));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findInactiveUsers() {
+        return userRepository.findByStatusAndLastLoginAtBefore(
+                Status.ACTIVE, OffsetDateTime.now(ZoneOffset.UTC).minusDays(30));
     }
 
     private User findActiveUser(Long userId) {

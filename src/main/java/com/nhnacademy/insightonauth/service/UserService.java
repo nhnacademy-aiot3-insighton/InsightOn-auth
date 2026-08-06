@@ -62,4 +62,8 @@ public interface UserService {
     UserLoginResponse oauthLogin(String provider, String code);
 
     TokenRefreshResponse refresh(Long userId, String refreshToken);
+
+    List<User> findExpiredWithdrawnUsers();
+
+    List<User> findInactiveUsers();
 }
