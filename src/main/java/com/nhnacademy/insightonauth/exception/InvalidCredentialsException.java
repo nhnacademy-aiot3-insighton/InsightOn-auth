@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.exception;
 
-public class InvalidCredentialsException extends RuntimeException {
+public class InvalidCredentialsException extends BusinessException {
     public InvalidCredentialsException(String message) {
-        super(message);
+        super(ErrorCode.INVALID_CREDENTIALS, message);
     }
 }

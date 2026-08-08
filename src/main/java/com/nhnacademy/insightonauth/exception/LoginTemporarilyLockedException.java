@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.exception;
 
-public class LoginTemporarilyLockedException extends RuntimeException {
+public class LoginTemporarilyLockedException extends BusinessException {
     public LoginTemporarilyLockedException(String message) {
-        super(message);
+        super(ErrorCode.LOGIN_TEMPORARILY_LOCKED, message);
     }
 }
