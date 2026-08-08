@@ -1,6 +1,5 @@
 package com.nhnacademy.insightonauth.controller;
 
-import com.nhnacademy.insightonauth.dto.ApiResponse;
 import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
 import com.nhnacademy.insightonauth.dto.mypage.PasswordChangeRequest;
 import com.nhnacademy.insightonauth.dto.mypage.RoleResponse;
@@ -32,16 +31,16 @@ public class MypageController {
 
     // 내 정보 조회
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<MyInfoResponse>> findMyInfo(
+    public ResponseEntity<MyInfoResponse> findMyInfo(
             @RequestHeader(name = X_USER_ID) @Valid Long userId) {
 
         MyInfoResponse response = myPageService.findMyInfo(userId);
-        return ResponseEntity.ok(new ApiResponse<>(response));
+        return ResponseEntity.ok(response);
     }
 
     // 내 정보 수정
     @PutMapping("/me")
-    public ResponseEntity<ApiResponse<Void>> updateMyInfo(
+    public ResponseEntity<Void> updateMyInfo(
             @RequestHeader(name = X_USER_ID) @Valid Long userId,
             @RequestBody @Valid MyInfoUpdateRequest request) {
 
@@ -59,7 +58,7 @@ public class MypageController {
 
     // 비밀번호 변경
     @PutMapping("/me/password")
-    public ResponseEntity<ApiResponse<Void>> changePassword(
+    public ResponseEntity<Void> changePassword(
             @RequestHeader(name = X_USER_ID) @Valid Long userId,
             @RequestBody @Valid PasswordChangeRequest request) {
 
@@ -69,25 +68,25 @@ public class MypageController {
 
     // 내 권한 목록 조회
     @GetMapping("/me/roles")
-    public ResponseEntity<ApiResponse<List<RoleResponse>>> findMyRoles(
+    public ResponseEntity<List<RoleResponse>> findMyRoles(
             @RequestHeader(name = X_USER_ID) @Valid Long userId) {
 
         List<RoleResponse> response = myPageService.findMyRoles(userId);
-        return ResponseEntity.ok(new ApiResponse<>(response));
+        return ResponseEntity.ok(response);
     }
 
     // 연동 소셜 계정 목록
     @GetMapping("/me/oauths")
-    public ResponseEntity<ApiResponse<List<OauthResponse>>> findMyOauths(
+    public ResponseEntity<List<OauthResponse>> findMyOauths(
             @RequestHeader(name = X_USER_ID) @Valid Long userId) {
 
         List<OauthResponse> response = myPageService.findMyOauths(userId);
-        return ResponseEntity.ok(new ApiResponse<>(response));
+        return ResponseEntity.ok(response);
     }
 
     // 소셜 계정 신규 연동
     @PostMapping("/me/oauths/{provider}")
-    public ResponseEntity<ApiResponse<Void>> linkOauth(
+    public ResponseEntity<Void> linkOauth(
             @RequestHeader(name = X_USER_ID) @Valid Long userId,
             @PathVariable String provider,
             @RequestBody @Valid OauthLoginRequest request) {
@@ -106,5 +105,4 @@ public class MypageController {
         oauthService.delete(user, oauthId);
         return ResponseEntity.noContent().build();
     }
-
 }
