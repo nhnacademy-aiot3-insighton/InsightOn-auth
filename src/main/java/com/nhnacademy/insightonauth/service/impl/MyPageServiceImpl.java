@@ -1,6 +1,7 @@
 package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.client.OauthClient;
+import com.nhnacademy.insightonauth.client.OauthClientResolver;
 import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
 import com.nhnacademy.insightonauth.dto.mypage.RoleResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
@@ -28,7 +29,7 @@ public class MyPageServiceImpl implements MyPageService {
     private final UserCredentialService userCredentialService;
     private final UserRoleService userRoleService;
     private final OauthService oauthService;
-    private final OauthClient oauthClient;
+    private final OauthClientResolver oauthClientResolver;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -73,6 +74,7 @@ public class MyPageServiceImpl implements MyPageService {
     public void linkOauth(Long userId, String provider, String code) {
         User user = userService.findById(userId);   // 이미 로그인된 그 사람
 
+        OauthClient oauthClient = oauthClientResolver.resolve(provider);
         OauthUserInfo userInfo = oauthClient.getUserInfo(code);   // Google 검증
 
         // 이 소셜 계정이 이미 다른 사람 것인지 확인 (중요!)
