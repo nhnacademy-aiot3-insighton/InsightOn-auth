@@ -1,9 +1,12 @@
 package com.nhnacademy.insightonauth.service.impl;
 
+import com.nhnacademy.insightonauth.client.CoreClient;
 import com.nhnacademy.insightonauth.client.OauthClient;
+import com.nhnacademy.insightonauth.client.OauthClientResolver;
 import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
+import com.nhnacademy.insightonauth.dto.core.ManagerGroupExistsResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.*;
@@ -16,6 +19,7 @@ import com.nhnacademy.insightonauth.service.*;
 import com.nhnacademy.insightonauth.util.PhoneNumberUtil;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,11 +31,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
+    // Transactional 전파 필요없으면 빼기 어노테이션 붙이기
+    // private 메소드의 Transactional의 붙는 경우 proxy가 적용안 될수 있음
     private final UserRepository userRepository;
     private final UserCredentialService userCredentialService;
     private final UserRoleService userRoleService;
@@ -39,8 +46,9 @@ public class UserServiceImpl implements UserService {
     private final JwtProvider jwtProvider;
     private final RedisService redisService;
     private final EmailService emailService;
-    private final OauthClient oauthClient;
+    private final OauthClientResolver oauthClientResolver;
     private final OauthService oauthService;
+    private final CoreClient coreClient;
 
     @Override
     public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken) {
@@ -99,6 +107,7 @@ public class UserServiceImpl implements UserService {
         }
 
         // 유저 계정 존재 여부 숨기기
+        // 기존대로 UserNotFound로 하는건 어떤가
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new InvalidCredentialsException("유저를 찾을 수 없습니다."));
         UserCredential credential = userCredentialService.findByUser(user);
@@ -213,6 +222,7 @@ public class UserServiceImpl implements UserService {
         user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
     }
 
+    // 전화번호 찾기시 인증이 방법시 생각해보기
     @Override
     public String findMaskedEmail(String userName, String phoneNumber) {
         String normalized = PhoneNumberUtil.normalize(phoneNumber);
@@ -254,6 +264,7 @@ public class UserServiceImpl implements UserService {
         user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
     }
 
+    //탈톼시 비밀번호 확인
     @Override
     public void withdraw(Long userId) {
         User user = findById(userId);
@@ -262,7 +273,21 @@ public class UserServiceImpl implements UserService {
             throw new InvalidUserStatusException("이미 탈퇴한 계정입니다.");
         }
 
+        ManagerGroupExistsResponse response;
+        try {
+            response = coreClient.existsManagerGroup(userId);
+        } catch (Exception e) {
+            log.warn("Core 서비스 호출 실패로 탈퇴를 차단합니다 - userId: {}, 원인: {}", userId, e.getMessage());
+            throw new CoreServiceUnavailableException(
+                    "일시적으로 그룹 정보를 확인할 수 없어 탈퇴가 제한됩니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        if (response.exists()) {
+            throw new ManagerGroupExistsException("그룹 관리자 역할이 있어 탈퇴할 수 없습니다.");
+        }
+
         user.withdraw();
+        redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
     }
 
     @Override
@@ -306,7 +331,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserLoginResponse oauthLogin(String provider, String code) {
-        OauthUserInfo userInfo = oauthClient.getUserInfo(provider, code);
+        OauthClient oauthClient = oauthClientResolver.resolve(provider);
+        OauthUserInfo userInfo = oauthClient.getUserInfo(code);
 
         Optional<Oauth> existingOauth = oauthService.findByProviderAndProviderUserId(provider, userInfo.providerId());
 
@@ -337,6 +363,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public TokenRefreshResponse refresh(Long userId, String refreshToken) {
+        // base64 왜쓰는지
         try {
             jwtProvider.validateRefreshToken(userId, refreshToken);   // Redis의 jti와 대조 검증
         } catch (JwtException e) {
@@ -355,6 +382,20 @@ public class UserServiceImpl implements UserService {
         String accessToken = jwtProvider.createAccessToken(userId, roles);
 
         return new TokenRefreshResponse(accessToken);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findExpiredWithdrawnUsers() {
+        return userRepository.findByStatusAndWithdrawnAtBefore(
+                Status.WITHDRAW, OffsetDateTime.now(ZoneOffset.UTC).minusDays(90));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findInactiveUsers() {
+        return userRepository.findByStatusAndLastLoginAtBefore(
+                Status.ACTIVE, OffsetDateTime.now(ZoneOffset.UTC).minusDays(30));
     }
 
     private User findActiveUser(Long userId) {

@@ -10,7 +10,9 @@ public enum RedisKey {
     LOGIN_LOCK("login-lock:"),
     PASSWORD_RESET("password-reset:"),
     REACTIVE("reactive:"),
-    BLACKLIST("blacklist:");
+    BLACKLIST("blacklist:"),
+    HARD_DELETE_SCHEDULER_LOCK("scheduler-lock:hard-delete-users"),
+    SLEEP_CONVERSION_SCHEDULER_LOCK("scheduler-lock:sleep-conversion");;
 
     private final String prefix;
 
