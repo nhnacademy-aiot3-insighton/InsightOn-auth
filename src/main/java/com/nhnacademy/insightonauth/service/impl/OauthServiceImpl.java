@@ -55,6 +55,7 @@ public class OauthServiceImpl implements OauthService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Oauth findOauth(User user, String provider) {
         return oauthRepository.findByUserAndProvider(user, provider)
                 .orElseThrow(() -> new OauthNotFoundException("연동된 소셜 계정을 찾을 수 없습니다."));
@@ -62,11 +63,13 @@ public class OauthServiceImpl implements OauthService {
 
     // 전체 삭제
     @Override
+    @Transactional(readOnly = true)
     public List<Oauth> findAllByUser(User user) {
         return oauthRepository.findByUser(user);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Oauth> findByProviderAndProviderUserId(String provider, String providerUserId) {
         return oauthRepository.findByProviderAndProviderUserId(provider, providerUserId);
     }

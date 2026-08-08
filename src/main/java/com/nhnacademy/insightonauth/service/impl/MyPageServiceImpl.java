@@ -33,6 +33,7 @@ public class MyPageServiceImpl implements MyPageService {
     private final PasswordEncoder passwordEncoder;
 
     @Override
+    @Transactional(readOnly = true)
     public MyInfoResponse findMyInfo(Long userId) {
         User user = userService.findById(userId);
 
@@ -53,6 +54,7 @@ public class MyPageServiceImpl implements MyPageService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<RoleResponse> findMyRoles(Long userId) {
         User user = userService.findById(userId);
 
@@ -62,6 +64,7 @@ public class MyPageServiceImpl implements MyPageService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<OauthResponse> findMyOauths(Long userId) {
         User user = userService.findById(userId);
 
