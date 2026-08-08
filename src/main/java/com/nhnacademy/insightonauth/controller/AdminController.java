@@ -1,7 +1,6 @@
 package com.nhnacademy.insightonauth.controller;
 
 
-import com.nhnacademy.insightonauth.dto.ApiResponse;
 import com.nhnacademy.insightonauth.dto.admin.AdminFindUsersResponse;
 import com.nhnacademy.insightonauth.dto.admin.AdminUserDetailResponse;
 import com.nhnacademy.insightonauth.dto.admin.RoleChangeRequest;
@@ -24,41 +23,41 @@ public class AdminController {
 
     // 회원 목록 조회 (검색·페이징)
     @GetMapping("/users")
-    public ResponseEntity<ApiResponse<Page<AdminFindUsersResponse>>> findUsers(
+    public ResponseEntity<Page<AdminFindUsersResponse>> findUsers(
             @RequestParam(required = false) String email,
             @RequestParam(required = false) String userName,
             @RequestParam(required = false) Status status,
             Pageable pageable) {
 
         Page<AdminFindUsersResponse> response = adminUserService.findUsers(email, userName, status, pageable);
-        return ResponseEntity.ok(new ApiResponse<>(response));
+        return ResponseEntity.ok(response);
     }
 
     // 회원 상세 조회
     @GetMapping("/users/{userId}")
-    public ResponseEntity<ApiResponse<AdminUserDetailResponse>> findUserDetail(@PathVariable Long userId) {
+    public ResponseEntity<AdminUserDetailResponse> findUserDetail(@PathVariable Long userId) {
         AdminUserDetailResponse response = adminUserService.findUserDetail(userId);
-        return ResponseEntity.ok(new ApiResponse<>(response));
+        return ResponseEntity.ok(response);
     }
 
     // 회원 상태 변경
     @PutMapping("/users/{userId}/status")
-    public ResponseEntity<ApiResponse<Void>> changeStatus(
+    public ResponseEntity<Void> changeStatus(
             @PathVariable Long userId,
             @RequestBody @Valid StatusChangeRequest request) {
 
         adminUserService.changeStatus(userId, request.status());
-        return ResponseEntity.ok(new ApiResponse<>(null));
+        return ResponseEntity.ok().build();
     }
 
     // 회원 권한 변경
     @PutMapping("/users/{userId}/roles")
-    public ResponseEntity<ApiResponse<Void>> changeRole(
+    public ResponseEntity<Void> changeRole(
             @PathVariable Long userId,
             @RequestBody @Valid RoleChangeRequest request) {
 
         adminUserService.addUserRole(userId, request.role());
-        return ResponseEntity.ok(new ApiResponse<>(null));
+        return ResponseEntity.ok().build();
     }
 
     // 회원 삭제 (실제로는 상태 변경 처리)

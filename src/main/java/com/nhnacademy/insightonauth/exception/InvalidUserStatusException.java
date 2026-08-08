@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.exception;
 
-public class InvalidUserStatusException extends RuntimeException {
+public class InvalidUserStatusException extends BusinessException {
     public InvalidUserStatusException(String message) {
-        super(message);
+        super(ErrorCode.INVALID_USER_STATUS, message);
     }
 }

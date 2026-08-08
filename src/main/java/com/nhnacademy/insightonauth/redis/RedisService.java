@@ -28,6 +28,7 @@ public class RedisService {
         return Boolean.TRUE.equals(redisTemplate.hasKey(key));
     }
 
+    // 수정 해야함
     public boolean setIfAbsent(String key, String value, Duration ttl) {
         Boolean result = redisTemplate.opsForValue().setIfAbsent(key, value, ttl);
         return Boolean.TRUE.equals(result);

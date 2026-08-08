@@ -4,12 +4,15 @@ import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.Map;
 
 @Component("googleOauthClient")
@@ -25,7 +28,12 @@ public class GoogleOauthClient implements OauthClient {
     @Value("${oauth.redirect-uri}")
     private String redirectUri;
 
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient =  RestClient.builder()
+            .requestFactory(ClientHttpRequestFactoryBuilder.detect()
+                    .build(ClientHttpRequestFactorySettings.defaults()
+                            .withConnectTimeout(Duration.ofSeconds(3))
+                            .withReadTimeout(Duration.ofSeconds(5))))
+            .build();
 
     @Override
     public OauthUserInfo getUserInfo(String code) {

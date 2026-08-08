@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.exception;
 
-public class DuplicatePhoneNumberException extends RuntimeException {
+public class DuplicatePhoneNumberException extends BusinessException {
     public DuplicatePhoneNumberException(String message) {
-        super(message);
+        super(ErrorCode.DUPLICATE_PHONE_NUMBER, message);
     }
 }

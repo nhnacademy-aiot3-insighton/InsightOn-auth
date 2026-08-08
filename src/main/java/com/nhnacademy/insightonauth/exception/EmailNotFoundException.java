@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.exception;
 
-public class EmailNotFoundException extends RuntimeException {
+public class EmailNotFoundException extends BusinessException {
     public EmailNotFoundException(String message) {
-        super(message);
+        super(ErrorCode.EMAIL_NOT_FOUND, message);
     }
 }
