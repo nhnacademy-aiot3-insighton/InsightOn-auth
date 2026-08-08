@@ -73,7 +73,7 @@ public class MyPageServiceImpl implements MyPageService {
     public void linkOauth(Long userId, String provider, String code) {
         User user = userService.findById(userId);   // 이미 로그인된 그 사람
 
-        OauthUserInfo userInfo = oauthClient.getUserInfo(provider, code);   // Google 검증
+        OauthUserInfo userInfo = oauthClient.getUserInfo(code);   // Google 검증
 
         // 이 소셜 계정이 이미 다른 사람 것인지 확인 (중요!)
         oauthService.findByProviderAndProviderUserId(provider, userInfo.providerId())
