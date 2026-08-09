@@ -6,10 +6,10 @@ import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
 import com.nhnacademy.insightonauth.dto.mypage.RoleResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
+import com.nhnacademy.insightonauth.entity.Oauth;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserCredential;
-import com.nhnacademy.insightonauth.exception.InvalidCredentialsException;
-import com.nhnacademy.insightonauth.exception.OauthAlreadyLinkedException;
+import com.nhnacademy.insightonauth.exception.*;
 import com.nhnacademy.insightonauth.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @Transactional
@@ -75,17 +76,45 @@ public class MyPageServiceImpl implements MyPageService {
 
     @Override
     public void linkOauth(Long userId, String provider, String code) {
-        User user = userService.findById(userId);   // 이미 로그인된 그 사람
-
+        User primaryUser = userService.findById(userId);
         OauthClient oauthClient = oauthClientResolver.resolve(provider);
-        OauthUserInfo userInfo = oauthClient.getUserInfo(code);   // Google 검증
+        OauthUserInfo userInfo = oauthClient.getUserInfo(code);
 
-        // 이 소셜 계정이 이미 다른 사람 것인지 확인 (중요!)
-        oauthService.findByProviderAndProviderUserId(provider, userInfo.providerId())
-                .ifPresent(existing -> {
-                    throw new OauthAlreadyLinkedException("이미 연동된 소셜 계정입니다.");
-                });
+        Optional<Oauth> conflictingOauth = oauthService.findByProviderAndProviderUserId(provider, userInfo.providerId());
 
-        oauthService.create(user, provider, userInfo.providerId());
+        if (conflictingOauth.isPresent()) {
+            User conflictingUser = conflictingOauth.get().getUser();
+
+            if (conflictingUser.getUserId().equals(primaryUser.getUserId())) {
+                throw new OauthAlreadyLinkedException("이미 연동된 소셜 계정입니다.");
+            }
+
+            // 다른 사람 계정에 연동되어 있음 → "병합할지" 물어봐야 하는 상황
+            throw new OauthLinkedToOtherAccountException(
+                    "이 계정은 이미 다른 계정에 연동되어 있습니다. 병합하시려면 확인 후 다시 요청해주세요.",
+                    conflictingUser.getUserId());
+        }
+
+        oauthService.create(primaryUser, provider, userInfo.providerId());
+    }
+
+    // 다른 계정 삭제하고 하나로 합치기
+    @Override
+    public void mergeAccount(Long primaryUserId, Long secondaryUserId, String provider, String providerUserId) {
+        User primaryUser = userService.findById(primaryUserId);
+
+        // 2차 확인 - secondaryUser가 정말 이 provider/providerUserId를 갖고 있는지 검증
+        Oauth secondaryOauth = oauthService.findByProviderAndProviderUserId(provider, providerUserId)
+                .orElseThrow(() -> new OauthNotFoundException("연동 정보를 찾을 수 없습니다."));
+
+        if (!secondaryOauth.getUser().getUserId().equals(secondaryUserId)) {
+            throw new InvalidMergeRequestException("병합 요청이 유효하지 않습니다.");
+        }
+
+        // Oauth를 primaryUser로 재연결
+        secondaryOauth.reassignUser(primaryUser);
+
+        // secondaryUser(연동 전에 사용하던 계정 삭제) 삭제
+        userService.deleteUser(secondaryUserId);
     }
 }

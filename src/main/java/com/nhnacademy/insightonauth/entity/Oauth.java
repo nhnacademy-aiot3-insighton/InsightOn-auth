@@ -40,4 +40,8 @@ public class Oauth {
         this.providerUserId = providerUserId;
         this.createdAt = OffsetDateTime.now(ZoneOffset.UTC);
     }
+
+    public void reassignUser(User newUser) {
+        this.user = newUser;
+    }
 }
