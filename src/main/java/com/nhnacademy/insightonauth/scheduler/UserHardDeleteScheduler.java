@@ -56,7 +56,13 @@ public class UserHardDeleteScheduler {
         } finally {
             // 내가 쥔 락일 때만 해제 (남의 락/이미 만료된 락은 건드리지 않음)
             if (lock.isHeldByCurrentThread()) {
-                lock.unlock();
+                try {
+                    lock.unlock();
+                } catch (IllegalMonitorStateException e) {
+                    // 확인~해제 사이 워치독 갱신 실패로 락이 만료돼 소유권을 잃은 경우
+                    log.warn("락 해제 실패 - 이미 소유권을 상실함 (TTL 만료 추정). lockKey={}",
+                            RedisKey.HARD_DELETE_SCHEDULER_LOCK.getPrefix());
+                }
             }
         }
     }

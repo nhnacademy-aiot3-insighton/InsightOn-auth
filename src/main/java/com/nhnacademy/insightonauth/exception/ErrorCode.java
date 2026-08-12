@@ -26,7 +26,8 @@ public enum ErrorCode {
     USER_CREDENTIALS_NOT_FOUND(HttpStatus.NOT_FOUND),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND),
     USER_ROLE_NOT_FOUND(HttpStatus.NOT_FOUND),
-    VERIFICATION_TEMPORARILY_LOCKED(HttpStatus.LOCKED);
+    VERIFICATION_TEMPORARILY_LOCKED(HttpStatus.LOCKED),
+    EMAIL_ALREADY_REGISTERED(HttpStatus.CONFLICT);
 
     private final HttpStatus status;
 

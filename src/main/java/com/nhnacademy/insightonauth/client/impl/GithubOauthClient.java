@@ -68,10 +68,7 @@ public class GithubOauthClient implements OauthClient {
                 .retrieve()
                 .body(Map.class);
 
-        String email = (String) userInfo.get("email");
-        if (email == null) {
-            email = requestPrimaryEmail(accessToken);   // 비공개 이메일 대응
-        }
+        String email = requestPrimaryEmail(accessToken);
 
         String name = (String) userInfo.get("name");
         if (name == null || name.isBlank()) {

@@ -349,6 +349,13 @@ public class UserServiceImpl implements UserService {
             return issueTokens(user, user.getEmail());
         }
 
+        // 새 User 만들기 전에, 이 이메일이 이미 가입돼 있는지 확인
+        if (userRepository.existsByEmail(userInfo.email())) {
+            // 이미 이 이메일로 가입된 계정이 있음 → 자동 생성/연결하지 않고 차단
+            throw new EmailAlreadyRegisteredException(
+                    "이미 가입된 이메일입니다. 로그인 후 마이페이지에서 소셜 계정을 연동해 주세요.");
+        }
+
         User newUser = new User(userInfo.email(), userInfo.name(), null);
         userRepository.save(newUser);
         userRoleService.create(newUser, Role.MEMBER);
