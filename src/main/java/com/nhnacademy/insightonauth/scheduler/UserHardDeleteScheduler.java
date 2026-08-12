@@ -2,15 +2,16 @@ package com.nhnacademy.insightonauth.scheduler;
 
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.redis.RedisKey;
-import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -18,12 +19,22 @@ import java.util.List;
 public class UserHardDeleteScheduler {
 
     private final UserService userService;
-    private final RedisService redisService;
+    private final RedissonClient redissonClient;
 
-    @Scheduled(cron = "0 0 1 * * *")
+    @Scheduled(cron = "0 0 1 * * *")   // 매일 새벽 1시
     public void hardDeleteExpiredUsers() {
-        String lockKey = RedisKey.HARD_DELETE_SCHEDULER_LOCK.getPrefix();
-        boolean acquired = redisService.setIfAbsent(lockKey, "locked", Duration.ofMinutes(30));
+        RLock lock = redissonClient.getLock(RedisKey.HARD_DELETE_SCHEDULER_LOCK.getPrefix());
+
+        boolean acquired;
+        try {
+            // waitTime=0 : 이미 남이 잡았으면 기다리지 않고 즉시 스킵
+            // leaseTime=-1 : 워치독 활성화 (작업이 끝날 때까지 TTL 자동 갱신)
+            acquired = lock.tryLock(0, -1, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("하드 삭제 락 획득 중 인터럽트 발생");
+            return;
+        }
 
         if (!acquired) {
             log.info("다른 인스턴스가 이미 이 작업을 실행 중입니다. 건너뜁니다.");
@@ -43,7 +54,10 @@ public class UserHardDeleteScheduler {
 
             log.info("탈퇴 계정 물리 삭제 완료 - 대상 {}건", targets.size());
         } finally {
-            redisService.delete(lockKey);
+            // 내가 쥔 락일 때만 해제 (남의 락/이미 만료된 락은 건드리지 않음)
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
     }
 }
