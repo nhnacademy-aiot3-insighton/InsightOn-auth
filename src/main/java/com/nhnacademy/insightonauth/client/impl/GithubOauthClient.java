@@ -5,12 +5,15 @@ import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.exception.EmailNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -27,7 +30,12 @@ public class GithubOauthClient implements OauthClient {
     @Value("${oauth.redirect-uri}")
     private String redirectUri;
 
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient = RestClient.builder()
+            .requestFactory(ClientHttpRequestFactoryBuilder.detect()
+                    .build(ClientHttpRequestFactorySettings.defaults()
+                            .withConnectTimeout(Duration.ofSeconds(3))
+                            .withReadTimeout(Duration.ofSeconds(5))))
+            .build();
 
     @Override
     public OauthUserInfo getUserInfo(String code) {
@@ -87,8 +95,10 @@ public class GithubOauthClient implements OauthClient {
                 .retrieve()
                 .body(List.class);
 
+        // primary git에서 대표로 지정된 이메일 가져옴, verified 그 중에 인증된거 가져옴
         return emails.stream()
-                .filter(e -> Boolean.TRUE.equals(e.get("primary")))
+                .filter(e ->
+                        Boolean.TRUE.equals(e.get("primary")) && Boolean.TRUE.equals(e.get("verified")))
                 .map(e -> (String) e.get("email"))
                 .findFirst()
                 .orElseThrow(() -> new EmailNotFoundException("GitHub 계정에서 이메일을 찾을 수 없습니다."));

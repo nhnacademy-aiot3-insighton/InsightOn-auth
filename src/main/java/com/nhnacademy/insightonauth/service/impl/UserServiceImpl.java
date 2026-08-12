@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -129,7 +130,7 @@ public class UserServiceImpl implements UserService {
             throw new InvalidUserException(user.getStatus().getMessage());
         }
 
-        user.setLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC));
+        user.updateLastLoginAt();
 
         return issueTokens(user, email);
     }
@@ -247,12 +248,6 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void updateLastLoginAt(Long userId) {
-        User user = findById(userId);
-        user.setLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC));
-    }
-
-    @Override
     public void activate(Long userId) {
         User user = findById(userId);
 
@@ -350,6 +345,7 @@ public class UserServiceImpl implements UserService {
                 throw new InvalidUserException(user.getStatus().getMessage());
             }
 
+            user.updateLastLoginAt();
             return issueTokens(user, user.getEmail());
         }
 
@@ -357,6 +353,7 @@ public class UserServiceImpl implements UserService {
         userRepository.save(newUser);
         userRoleService.create(newUser, Role.MEMBER);
         oauthService.create(newUser, provider, userInfo.providerId());
+        newUser.updateLastLoginAt();
 
         return issueTokens(newUser, userInfo.email());
     }

@@ -40,7 +40,6 @@ public class User {
     @Column(name = "status", nullable = false, length = 20)
     private Status status;
 
-    @Setter
     @Column(name = "last_login_at", nullable = true)
     private OffsetDateTime lastLoginAt;
 
@@ -64,6 +63,10 @@ public class User {
         this.status = Status.ACTIVE;
         this.updatedAt = now;
         this.createdAt = now;
+    }
+
+    public void updateLastLoginAt() {
+        this.lastLoginAt = OffsetDateTime.now(ZoneOffset.UTC);
     }
 
     public void reactivate() {

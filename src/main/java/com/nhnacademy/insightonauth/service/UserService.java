@@ -47,8 +47,6 @@ public interface UserService {
 
     String findMaskedEmail(String userName, String phoneNumber);
 
-    void updateLastLoginAt(Long userId);
-
     void activate(Long userId);
 
     void withdraw(Long userId);
