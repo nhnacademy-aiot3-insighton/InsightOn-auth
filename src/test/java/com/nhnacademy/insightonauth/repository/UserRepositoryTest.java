@@ -145,7 +145,7 @@ class UserRepositoryTest {
     @Test
     @DisplayName("30일 미접속 유저 조회")
     void findByStatusAndLastLoginAtBefore_returnsInactiveUsers() {
-        activeUser.setLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(40));
+        activeUser.updateLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(40));
         userRepository.save(activeUser);
 
         List<User> result = userRepository.findByStatusAndLastLoginAtBefore(
@@ -157,7 +157,7 @@ class UserRepositoryTest {
     @Test
     @DisplayName("최근 접속 유저 제외")
     void findByStatusAndLastLoginAtBefore_excludesRecentlyActiveUsers() {
-        activeUser.setLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC));
+        activeUser.updateLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC));
         userRepository.save(activeUser);
 
         List<User> result = userRepository.findByStatusAndLastLoginAtBefore(

@@ -69,6 +69,10 @@ public class User {
         this.lastLoginAt = OffsetDateTime.now(ZoneOffset.UTC);
     }
 
+    public void updateLastLoginAt(OffsetDateTime lastLoginAt) {  // 테스트/특정 시각 지정용
+        this.lastLoginAt = lastLoginAt;
+    }
+
     public void reactivate() {
         if (this.status != Status.SLEEP && this.status != Status.WITHDRAW) {
             throw new InvalidUserStatusException("휴면 또는 탈퇴 상태가 아닙니다.");
