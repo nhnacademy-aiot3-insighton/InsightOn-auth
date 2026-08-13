@@ -81,16 +81,23 @@ public class UserServiceImpl implements UserService {
         if (redisService.hasKey(RedisKey.VERIFY_RESEND_LOCK.getPrefix() + email)) {
             throw new VerificationResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
         }
-        // 2. 재전송 연타 방지 체크
-        if (redisService.hasKey(RedisKey.VERIFY_RESEND_COOLDOWN.getPrefix() + email)) {
-            throw new VerificationResendTooSoonException("잠시 후 다시 시도해 주세요.");
+        // 2. 쿨다운을 원자적으로 설정
+        boolean acquired = redisService.setIfAbsent(
+                RedisKey.VERIFY_RESEND_COOLDOWN.getPrefix() + email,
+                "1",
+                Duration.ofSeconds(60)
+        );
+
+        if (!acquired) {
+            throw new VerificationResendTooSoonException(
+                    "잠시 후 다시 시도해 주세요."
+            );
         }
 
         // 3. 발송
         emailService.sendVerificationCode(email);
 
-        // 4. 발송 후: 쿨다운 걸기 + 카운터 증가
-        redisService.set(RedisKey.VERIFY_RESEND_COOLDOWN.getPrefix() + email, "1", Duration.ofSeconds(60));
+        // 4. 카운터 증가
         increaseResendCount(email);
     }
 
@@ -191,6 +198,7 @@ public class UserServiceImpl implements UserService {
         return issueTokens(user, user.getEmail());
     }
 
+    // 이러면 없는 계정은 응답이 더 빨리 나가기 때문에 공격자가 계정 존재 여부를 알 수 있음
     @Override
     public void passwordResetRequest(String email) {
         // 1. 연타 방지/잠금 체크 — 계정 여부와 무관하게 항상

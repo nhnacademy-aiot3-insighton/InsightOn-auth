@@ -124,15 +124,19 @@ public class EmailService {
 
     public String emailTokenVerify(String token) {
         String savedEmail = redisService.get(RedisKey.PASSWORD_RESET.getPrefix() + token);
-
-        // 토큰 만료 또는 존재하지 않는 토큰
         if (savedEmail == null || savedEmail.isBlank()) {
             throw new InvalidVerificationTokenException("인증 토큰이 올바르지 않거나 만료되었습니다.");
         }
 
-        // 정방향 + 역방향 키 모두 삭제 (토큰 1회용, 재설정 완료 후 정리)
+        // 정방향 토큰은 삭제 (이 token은 사용됨)
         redisService.delete(RedisKey.PASSWORD_RESET.getPrefix() + token);
-        redisService.delete(RedisKey.PASSWORD_RESET_BY_EMAIL.getPrefix() + savedEmail);
+
+        // 역방향 키는 "아직 이 token을 가리킬 때만" 삭제
+        String currentUuid = redisService.get(RedisKey.PASSWORD_RESET_BY_EMAIL.getPrefix() + savedEmail);
+        if (token.equals(currentUuid)) {
+            redisService.delete(RedisKey.PASSWORD_RESET_BY_EMAIL.getPrefix() + savedEmail);
+        }
+        // 다르면 = 그 사이 새 토큰 발급됨 = 최신 역방향은 건드리지 않음
 
         return savedEmail;
     }

@@ -27,4 +27,10 @@ public class RedisService {
     public boolean hasKey(String key) {
         return Boolean.TRUE.equals(redisTemplate.hasKey(key));
     }
+
+    public boolean setIfAbsent(String key, String value, Duration ttl) {
+        return Boolean.TRUE.equals(
+                redisTemplate.opsForValue().setIfAbsent(key, value, ttl)
+        );
+    }
 }
