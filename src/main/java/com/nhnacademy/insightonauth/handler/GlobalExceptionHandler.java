@@ -2,6 +2,8 @@ package com.nhnacademy.insightonauth.handler;
 
 import com.nhnacademy.insightonauth.exception.BusinessException;
 import com.nhnacademy.insightonauth.exception.ErrorResponse;
+import com.nhnacademy.insightonauth.exception.OauthConflictResponse;
+import com.nhnacademy.insightonauth.exception.OauthLinkedToOtherAccountException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +15,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    // OAuth 병합 유도 — conflictingUserId를 응답에 포함
+    @ExceptionHandler(OauthLinkedToOtherAccountException.class)
+    public ResponseEntity<OauthConflictResponse> handleOauthLinkedToOtherAccount(
+            OauthLinkedToOtherAccountException e) {
+        return ResponseEntity.status(e.getStatus())
+                .body(new OauthConflictResponse(
+                        e.getStatus().value(),
+                        e.getMessage(),
+                        e.getConflictingUserId()));
+    }
 
     // 비즈니스 로직 실패
     @ExceptionHandler(BusinessException.class)

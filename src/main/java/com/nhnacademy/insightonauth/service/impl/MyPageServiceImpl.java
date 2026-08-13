@@ -101,6 +101,11 @@ public class MyPageServiceImpl implements MyPageService {
     // 다른 계정 삭제하고 하나로 합치기
     @Override
     public void mergeAccount(Long primaryUserId, Long secondaryUserId, String provider, String providerUserId) {
+        // ★ 같은 계정끼리 병합 거부 (자기 자신 병합 시 계정 삭제 방지)
+        if (primaryUserId.equals(secondaryUserId)) {
+            throw new InvalidMergeRequestException("자기 자신과는 병합할 수 없습니다.");
+        }
+
         User primaryUser = userService.findById(primaryUserId);
 
         // 2차 확인 - secondaryUser가 정말 이 provider/providerUserId를 갖고 있는지 검증

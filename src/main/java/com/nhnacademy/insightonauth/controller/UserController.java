@@ -61,32 +61,22 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<UserLoginResponse> doLogin(
+    public ResponseEntity<String> doLogin(
             @RequestBody @Valid UserLoginRequest userLoginRequest) {
         UserLoginResponse userLoginResponse = userService.login(userLoginRequest.email(), userLoginRequest.password());
 
-        // 로컬용
+        // 도커용
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", userLoginResponse.refreshToken())
                 .httpOnly(true)
-                .secure(false)          // http라 false
+                .secure(true)           // https라 true
                 .path("/")
-                .domain("localhost")    // 포트 무관 공유
                 .sameSite("Lax")
                 .maxAge(Duration.ofDays(7))
-                .build();
-
-        // 도커용
-//        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", userLoginResponse.refreshToken())
-//                .httpOnly(true)
-//                .secure(true)           // https라 true
-//                .path("/")
-//                .sameSite("Lax")
-//                .maxAge(Duration.ofDays(7))
-//                .build();               // domain 안 박음
+                .build();               // domain 안 박음
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())   // refresh 쿠키 헤더에 설정
-                .body(userLoginResponse);
+                .body(userLoginResponse.accessToken());
 
     }
 
