@@ -27,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -78,12 +77,26 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void emailVerifyRequest(String email) {
+        // 1. 재전송 잠금 체크 (더 강한 제한 먼저)
+        if (redisService.hasKey(RedisKey.VERIFY_RESEND_LOCK.getPrefix() + email)) {
+            throw new VerificationResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+        }
+        // 2. 재전송 연타 방지 체크
+        if (redisService.hasKey(RedisKey.VERIFY_RESEND_COOLDOWN.getPrefix() + email)) {
+            throw new VerificationResendTooSoonException("잠시 후 다시 시도해 주세요.");
+        }
+
+        // 3. 발송
         emailService.sendVerificationCode(email);
+
+        // 4. 발송 후: 쿨다운 걸기 + 카운터 증가
+        redisService.set(RedisKey.VERIFY_RESEND_COOLDOWN.getPrefix() + email, "1", Duration.ofSeconds(60));
+        increaseResendCount(email);
     }
 
     @Override
     public String emailVerifyConfirm(String email, String code) {
-        return emailService.emailVerify(email, code);
+        return emailService.emailCodeVerify(email, code);
     }
 
     @Override
@@ -154,7 +167,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserLoginResponse reactivateConfirm(String email, String code) {
-        emailService.emailVerify(email, code);
+        emailService.emailCodeVerify(email, code);
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
@@ -180,10 +193,22 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void passwordResetRequest(String email) {
-        // 탈퇴 계정은 메일이 나가지 않게 조정, 예외를 던지면 공격자가 계정 존재를 알 수 있음
+        // 1. 연타 방지/잠금 체크 — 계정 여부와 무관하게 항상
+        if (redisService.hasKey(RedisKey.PASSWORD_RESET_RESEND_LOCK.getPrefix() + email)) {
+            throw new PasswordResetResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+        }
+        if (redisService.hasKey(RedisKey.PASSWORD_RESET_RESEND_COOLDOWN.getPrefix() + email)) {
+            throw new PasswordResetResendTooSoonException("잠시 후 다시 시도해 주세요.");
+        }
+
+        // 2. 연타 방지/카운터 기록 — 계정 여부와 무관하게 항상 (열거 방지 핵심)
+        redisService.set(RedisKey.PASSWORD_RESET_RESEND_COOLDOWN.getPrefix() + email, "1", Duration.ofSeconds(60));
+        increasePasswordResetResendCount(email);
+
+        // 3. 실제 메일 발송만 계정 있고 정상일 때 (없어도 예외 안 던짐)
         userRepository.findByEmail(email).ifPresent(user -> {
             if (user.getStatus() == Status.WITHDRAW) {
-                return;
+                return;   // 탈퇴 계정: 메일만 안 보냄 (rate limit은 이미 걸림)
             }
             emailService.sendPasswordResetPath(email);
         });
@@ -453,5 +478,32 @@ public class UserServiceImpl implements UserService {
 
         return UserLoginResponse.pendingRestore(restoreToken);
 
+    }
+
+    private void increaseResendCount(String email) {
+        String saved = redisService.get(RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email);
+        int count = (saved == null || saved.isBlank()) ? 0 : Integer.parseInt(saved);
+        count++;
+
+        if (count >= 5) {
+            redisService.delete(RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email);
+            redisService.set(RedisKey.VERIFY_RESEND_LOCK.getPrefix() + email, "locked", Duration.ofMinutes(30));
+        } else {
+            redisService.set(RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email,
+                    String.valueOf(count), Duration.ofMinutes(30));
+        }
+    }
+
+    private void increasePasswordResetResendCount(String email) {
+        String saved = redisService.get(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email);
+        int count = (saved == null || saved.isBlank()) ? 0 : Integer.parseInt(saved);
+        count++;
+        if (count >= 5) {
+            redisService.delete(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email);
+            redisService.set(RedisKey.PASSWORD_RESET_RESEND_LOCK.getPrefix() + email, "locked", Duration.ofMinutes(30));
+        } else {
+            redisService.set(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email,
+                    String.valueOf(count), Duration.ofMinutes(30));
+        }
     }
 }
