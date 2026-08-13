@@ -1,7 +1,5 @@
 package com.nhnacademy.insightonauth.filter;
 
-import com.nhnacademy.insightonauth.entity.User;
-import com.nhnacademy.insightonauth.entity.UserRole;
 import com.nhnacademy.insightonauth.service.UserRoleService;
 import com.nhnacademy.insightonauth.service.UserService;
 import jakarta.servlet.FilterChain;
@@ -16,10 +14,10 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -33,18 +31,25 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String userIdHeader = request.getHeader("X-User-Id");
+        // admin만 role 줄거임 그외는 다 null로 들어올거라 null체크
+        String rolesHeader = request.getHeader("X-User-Role");
 
         if (userIdHeader != null) {
-            Long userId = Long.valueOf(userIdHeader);
+            try {
+                Long userId = Long.valueOf(userIdHeader);
 
-            User user = userService.findById(userId);
-            List<UserRole> userRoles = userRoleService.findByUser(user);
-            List<GrantedAuthority> authorities = userRoles.stream()
-                    .map(userRole -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + userRole.getRole().name()))
-                    .toList();
+                List<GrantedAuthority> authorities = new ArrayList<>();
+                if (rolesHeader != null && !rolesHeader.isBlank()) {
+                    for (String role : rolesHeader.split(",")) {
+                        authorities.add(new SimpleGrantedAuthority("ROLE_" + role.trim()));
+                    }
+                }
 
-            Authentication auth = new UsernamePasswordAuthenticationToken(userId, null, authorities);
-            SecurityContextHolder.getContext().setAuthentication(auth);
+                Authentication auth = new UsernamePasswordAuthenticationToken(userId, null, authorities);
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            } catch (Exception e) {
+                log.debug("유효하지 않은 인증 헤더 - X-User-Id: {}, X-User-Role: {}", userIdHeader, rolesHeader);
+            }
         }
 
         filterChain.doFilter(request, response);

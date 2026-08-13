@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.exception;
 
-public class RefreshTokenNotFoundException extends RuntimeException {
+public class RefreshTokenNotFoundException extends BusinessException {
     public RefreshTokenNotFoundException(String message) {
-        super(message);
+        super(ErrorCode.REFRESH_TOKEN_NOT_FOUND, message);
     }
 }

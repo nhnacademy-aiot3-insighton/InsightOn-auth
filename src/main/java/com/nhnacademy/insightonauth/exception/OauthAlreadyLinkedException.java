@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.exception;
 
-public class OauthAlreadyLinkedException extends RuntimeException {
+public class OauthAlreadyLinkedException extends BusinessException {
     public OauthAlreadyLinkedException(String message) {
-        super(message);
+        super(ErrorCode.OAUTH_ALREADY_LINKED, message);
     }
 }

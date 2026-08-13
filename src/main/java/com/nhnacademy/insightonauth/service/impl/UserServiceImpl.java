@@ -1,9 +1,12 @@
 package com.nhnacademy.insightonauth.service.impl;
 
+import com.nhnacademy.insightonauth.client.CoreClient;
 import com.nhnacademy.insightonauth.client.OauthClient;
+import com.nhnacademy.insightonauth.client.OauthClientResolver;
 import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
+import com.nhnacademy.insightonauth.dto.core.ManagerGroupExistsResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.*;
@@ -16,6 +19,7 @@ import com.nhnacademy.insightonauth.service.*;
 import com.nhnacademy.insightonauth.util.PhoneNumberUtil;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,11 +31,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
+    // Transactional 전파 필요없으면 빼기 어노테이션 붙이기
+    // private 메소드의 Transactional의 붙는 경우 proxy가 적용안 될수 있음
     private final UserRepository userRepository;
     private final UserCredentialService userCredentialService;
     private final UserRoleService userRoleService;
@@ -39,8 +46,9 @@ public class UserServiceImpl implements UserService {
     private final JwtProvider jwtProvider;
     private final RedisService redisService;
     private final EmailService emailService;
-    private final OauthClient oauthClient;
+    private final OauthClientResolver oauthClientResolver;
     private final OauthService oauthService;
+    private final CoreClient coreClient;
 
     @Override
     public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken) {
@@ -69,12 +77,33 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void emailVerifyRequest(String email) {
+        // 1. 재전송 잠금 체크 (더 강한 제한 먼저)
+        if (redisService.hasKey(RedisKey.VERIFY_RESEND_LOCK.getPrefix() + email)) {
+            throw new VerificationResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+        }
+        // 2. 쿨다운을 원자적으로 설정
+        boolean acquired = redisService.setIfAbsent(
+                RedisKey.VERIFY_RESEND_COOLDOWN.getPrefix() + email,
+                "1",
+                Duration.ofSeconds(60)
+        );
+
+        if (!acquired) {
+            throw new VerificationResendTooSoonException(
+                    "잠시 후 다시 시도해 주세요."
+            );
+        }
+
+        // 3. 발송
         emailService.sendVerificationCode(email);
+
+        // 4. 카운터 증가
+        increaseResendCount(email);
     }
 
     @Override
     public String emailVerifyConfirm(String email, String code) {
-        return emailService.emailVerify(email, code);
+        return emailService.emailCodeVerify(email, code);
     }
 
     @Override
@@ -99,6 +128,7 @@ public class UserServiceImpl implements UserService {
         }
 
         // 유저 계정 존재 여부 숨기기
+        // 기존대로 UserNotFound로 하는건 어떤가
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new InvalidCredentialsException("유저를 찾을 수 없습니다."));
         UserCredential credential = userCredentialService.findByUser(user);
@@ -120,7 +150,7 @@ public class UserServiceImpl implements UserService {
             throw new InvalidUserException(user.getStatus().getMessage());
         }
 
-        user.setLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC));
+        user.updateLastLoginAt();
 
         return issueTokens(user, email);
     }
@@ -144,7 +174,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserLoginResponse reactivateConfirm(String email, String code) {
-        emailService.emailVerify(email, code);
+        emailService.emailCodeVerify(email, code);
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
@@ -168,12 +198,25 @@ public class UserServiceImpl implements UserService {
         return issueTokens(user, user.getEmail());
     }
 
+    // 이러면 없는 계정은 응답이 더 빨리 나가기 때문에 공격자가 계정 존재 여부를 알 수 있음
     @Override
     public void passwordResetRequest(String email) {
-        // 탈퇴 계정은 메일이 나가지 않게 조정, 예외를 던지면 공격자가 계정 존재를 알 수 있음
+        // 1. 연타 방지/잠금 체크 — 계정 여부와 무관하게 항상
+        if (redisService.hasKey(RedisKey.PASSWORD_RESET_RESEND_LOCK.getPrefix() + email)) {
+            throw new PasswordResetResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+        }
+        if (redisService.hasKey(RedisKey.PASSWORD_RESET_RESEND_COOLDOWN.getPrefix() + email)) {
+            throw new PasswordResetResendTooSoonException("잠시 후 다시 시도해 주세요.");
+        }
+
+        // 2. 연타 방지/카운터 기록 — 계정 여부와 무관하게 항상 (열거 방지 핵심)
+        redisService.set(RedisKey.PASSWORD_RESET_RESEND_COOLDOWN.getPrefix() + email, "1", Duration.ofSeconds(60));
+        increasePasswordResetResendCount(email);
+
+        // 3. 실제 메일 발송만 계정 있고 정상일 때 (없어도 예외 안 던짐)
         userRepository.findByEmail(email).ifPresent(user -> {
             if (user.getStatus() == Status.WITHDRAW) {
-                return;
+                return;   // 탈퇴 계정: 메일만 안 보냄 (rate limit은 이미 걸림)
             }
             emailService.sendPasswordResetPath(email);
         });
@@ -213,6 +256,7 @@ public class UserServiceImpl implements UserService {
         user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
     }
 
+    // 전화번호 찾기시 인증이 방법시 생각해보기
     @Override
     public String findMaskedEmail(String userName, String phoneNumber) {
         String normalized = PhoneNumberUtil.normalize(phoneNumber);
@@ -237,12 +281,6 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void updateLastLoginAt(Long userId) {
-        User user = findById(userId);
-        user.setLastLoginAt(OffsetDateTime.now(ZoneOffset.UTC));
-    }
-
-    @Override
     public void activate(Long userId) {
         User user = findById(userId);
 
@@ -254,6 +292,7 @@ public class UserServiceImpl implements UserService {
         user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
     }
 
+    //탈톼시 비밀번호 확인
     @Override
     public void withdraw(Long userId) {
         User user = findById(userId);
@@ -262,7 +301,21 @@ public class UserServiceImpl implements UserService {
             throw new InvalidUserStatusException("이미 탈퇴한 계정입니다.");
         }
 
+        ManagerGroupExistsResponse response;
+        try {
+            response = coreClient.existsManagerGroup(userId);
+        } catch (Exception e) {
+            log.warn("Core 서비스 호출 실패로 탈퇴를 차단합니다 - userId: {}, 원인: {}", userId, e.getMessage());
+            throw new CoreServiceUnavailableException(
+                    "일시적으로 그룹 정보를 확인할 수 없어 탈퇴가 제한됩니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        if (response.exists()) {
+            throw new ManagerGroupExistsException("그룹 관리자 역할이 있어 탈퇴할 수 없습니다.");
+        }
+
         user.withdraw();
+        redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
     }
 
     @Override
@@ -306,7 +359,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserLoginResponse oauthLogin(String provider, String code) {
-        OauthUserInfo userInfo = oauthClient.getUserInfo(provider, code);
+        OauthClient oauthClient = oauthClientResolver.resolve(provider);
+        OauthUserInfo userInfo = oauthClient.getUserInfo(code);
 
         Optional<Oauth> existingOauth = oauthService.findByProviderAndProviderUserId(provider, userInfo.providerId());
 
@@ -324,19 +378,29 @@ public class UserServiceImpl implements UserService {
                 throw new InvalidUserException(user.getStatus().getMessage());
             }
 
+            user.updateLastLoginAt();
             return issueTokens(user, user.getEmail());
+        }
+
+        // 새 User 만들기 전에, 이 이메일이 이미 가입돼 있는지 확인
+        if (userRepository.existsByEmail(userInfo.email())) {
+            // 이미 이 이메일로 가입된 계정이 있음 → 자동 생성/연결하지 않고 차단
+            throw new EmailAlreadyRegisteredException(
+                    "이미 가입된 이메일입니다. 로그인 후 마이페이지에서 소셜 계정을 연동해 주세요.");
         }
 
         User newUser = new User(userInfo.email(), userInfo.name(), null);
         userRepository.save(newUser);
         userRoleService.create(newUser, Role.MEMBER);
         oauthService.create(newUser, provider, userInfo.providerId());
+        newUser.updateLastLoginAt();
 
         return issueTokens(newUser, userInfo.email());
     }
 
     @Override
     public TokenRefreshResponse refresh(Long userId, String refreshToken) {
+        // base64 왜쓰는지
         try {
             jwtProvider.validateRefreshToken(userId, refreshToken);   // Redis의 jti와 대조 검증
         } catch (JwtException e) {
@@ -355,6 +419,20 @@ public class UserServiceImpl implements UserService {
         String accessToken = jwtProvider.createAccessToken(userId, roles);
 
         return new TokenRefreshResponse(accessToken);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findExpiredWithdrawnUsers() {
+        return userRepository.findByStatusAndWithdrawnAtBefore(
+                Status.WITHDRAW, OffsetDateTime.now(ZoneOffset.UTC).minusDays(90));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findInactiveUsers() {
+        return userRepository.findByStatusAndLastLoginAtBefore(
+                Status.ACTIVE, OffsetDateTime.now(ZoneOffset.UTC).minusDays(30));
     }
 
     private User findActiveUser(Long userId) {
@@ -408,5 +486,32 @@ public class UserServiceImpl implements UserService {
 
         return UserLoginResponse.pendingRestore(restoreToken);
 
+    }
+
+    private void increaseResendCount(String email) {
+        String saved = redisService.get(RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email);
+        int count = (saved == null || saved.isBlank()) ? 0 : Integer.parseInt(saved);
+        count++;
+
+        if (count >= 5) {
+            redisService.delete(RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email);
+            redisService.set(RedisKey.VERIFY_RESEND_LOCK.getPrefix() + email, "locked", Duration.ofMinutes(30));
+        } else {
+            redisService.set(RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email,
+                    String.valueOf(count), Duration.ofMinutes(30));
+        }
+    }
+
+    private void increasePasswordResetResendCount(String email) {
+        String saved = redisService.get(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email);
+        int count = (saved == null || saved.isBlank()) ? 0 : Integer.parseInt(saved);
+        count++;
+        if (count >= 5) {
+            redisService.delete(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email);
+            redisService.set(RedisKey.PASSWORD_RESET_RESEND_LOCK.getPrefix() + email, "locked", Duration.ofMinutes(30));
+        } else {
+            redisService.set(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email,
+                    String.valueOf(count), Duration.ofMinutes(30));
+        }
     }
 }

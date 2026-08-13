@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.exception;
 
-public class InvalidVerificationCodeException extends RuntimeException {
+public class InvalidVerificationCodeException extends BusinessException {
     public InvalidVerificationCodeException(String message) {
-        super(message);
+        super(ErrorCode.INVALID_VERIFICATION_CODE, message);
     }
 }

@@ -28,6 +28,7 @@ public class UserCredentialServiceImpl implements UserCredentialService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserCredential findByUser(User user) {
         UserCredential userCredential = userCredentialRepository.findByUser(user)
                 .orElseThrow(() -> new UserCredentialsNotFoundException("유저 인증 정보가 없습니다."));
@@ -49,6 +50,7 @@ public class UserCredentialServiceImpl implements UserCredentialService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean exists(User user) {
         return userCredentialRepository.existsByUser(user);
     }

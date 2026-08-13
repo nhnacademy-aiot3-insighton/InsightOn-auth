@@ -47,8 +47,6 @@ public interface UserService {
 
     String findMaskedEmail(String userName, String phoneNumber);
 
-    void updateLastLoginAt(Long userId);
-
     void activate(Long userId);
 
     void withdraw(Long userId);
@@ -62,4 +60,8 @@ public interface UserService {
     UserLoginResponse oauthLogin(String provider, String code);
 
     TokenRefreshResponse refresh(Long userId, String refreshToken);
+
+    List<User> findExpiredWithdrawnUsers();
+
+    List<User> findInactiveUsers();
 }
