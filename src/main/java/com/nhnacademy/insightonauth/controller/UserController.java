@@ -6,9 +6,13 @@ import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.Duration;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -61,7 +65,29 @@ public class UserController {
             @RequestBody @Valid UserLoginRequest userLoginRequest) {
         UserLoginResponse userLoginResponse = userService.login(userLoginRequest.email(), userLoginRequest.password());
 
-        return ResponseEntity.ok(userLoginResponse);
+        // 로컬용
+        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", userLoginResponse.refreshToken())
+                .httpOnly(true)
+                .secure(false)          // http라 false
+                .path("/")
+                .domain("localhost")    // 포트 무관 공유
+                .sameSite("Lax")
+                .maxAge(Duration.ofDays(7))
+                .build();
+
+        // 도커용
+//        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", userLoginResponse.refreshToken())
+//                .httpOnly(true)
+//                .secure(true)           // https라 true
+//                .path("/")
+//                .sameSite("Lax")
+//                .maxAge(Duration.ofDays(7))
+//                .build();               // domain 안 박음
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())   // refresh 쿠키 헤더에 설정
+                .body(userLoginResponse);
+
     }
 
     @PostMapping("/logout")

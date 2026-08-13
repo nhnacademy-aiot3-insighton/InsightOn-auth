@@ -31,6 +31,7 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String userIdHeader = request.getHeader("X-User-Id");
+        // admin만 role 줄거임 그외는 다 null로 들어올거라 null체크
         String rolesHeader = request.getHeader("X-User-Role");
 
         if (userIdHeader != null) {

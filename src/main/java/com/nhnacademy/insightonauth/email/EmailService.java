@@ -1,9 +1,6 @@
 package com.nhnacademy.insightonauth.email;
 
-import com.nhnacademy.insightonauth.exception.EmailSendException;
-import com.nhnacademy.insightonauth.exception.InvalidVerificationCodeException;
-import com.nhnacademy.insightonauth.exception.InvalidVerificationTokenException;
-import com.nhnacademy.insightonauth.exception.VerificationTemporarilyLockedException;
+import com.nhnacademy.insightonauth.exception.*;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import jakarta.mail.MessagingException;
@@ -51,14 +48,23 @@ public class EmailService {
 
     // 비밀번호 재설정 경로 발성
     public void sendPasswordResetPath(String email) {
+        // 1. 역방향 키로 이 이메일의 기존 토큰을 찾아 예전 링크를 무효화
+        String oldUuid = redisService.get(RedisKey.PASSWORD_RESET_BY_EMAIL.getPrefix() + email);
+        if (oldUuid != null && !oldUuid.isBlank()) {
+            redisService.delete(RedisKey.PASSWORD_RESET.getPrefix() + oldUuid);
+        }
+
+        // 2. 새 토큰 발급
         String uuid = UUID.randomUUID().toString();
-        // 재설정 경로
         String path = "https://insighton.store/password/reset?token=" + uuid;
 
-        // Redis에 저장 (10분 TTL)
+        // 3. 정방향 키 저장 (uuid → email, 10분 TTL)
         redisService.set(RedisKey.PASSWORD_RESET.getPrefix() + uuid, email, Duration.ofMinutes(10));
 
-        // 메일 발송
+        // 4. 역방향 키 갱신 (email → uuid, 같은 TTL)
+        redisService.set(RedisKey.PASSWORD_RESET_BY_EMAIL.getPrefix() + email, uuid, Duration.ofMinutes(10));
+
+        // 5. 메일 발송
         send(email, "[InsightOn] 비밀번호 재설정",
                 "비밀번호 재설정 경로: " + path + "\n10분 이내에 수정해 주세요.");
     }
@@ -82,7 +88,8 @@ public class EmailService {
     }
 
     // 이메일 코드 확인
-    public String emailVerify(String email, String inputCode) {
+    public String emailCodeVerify(String email, String inputCode) {
+        // 입력 실패 잠금 체크 (검증 전용)
         if (redisService.hasKey(RedisKey.VERIFY_FAIL_LOCK.getPrefix() + email)) {
             throw new VerificationTemporarilyLockedException("인증 시도가 5회 초과되어 5분간 잠겼습니다.");
         }
@@ -90,16 +97,16 @@ public class EmailService {
         String savedCode = redisService.get(RedisKey.VERIFY.getPrefix() + email);
 
         if (savedCode == null || !savedCode.equals(inputCode)) {
-            // 만료되었거나 애초에 요청한 적 없음
-            increaseVerifyFailCount(email);
+            increaseVerifyFailCount(email);   // 입력 실패 카운트 (여기서 5회 넘으면 VERIFY_FAIL_LOCK 걸림)
             throw new InvalidVerificationCodeException("인증 코드가 올바르지 않거나 만료되었습니다.");
         }
+
+        // 성공 처리
         redisService.delete(RedisKey.VERIFY_FAIL.getPrefix() + email);
         redisService.delete(RedisKey.VERIFY.getPrefix() + email);
 
         String verificationToken = UUID.randomUUID().toString();
         redisService.set(RedisKey.VERIFIED.getPrefix() + email, verificationToken, Duration.ofMinutes(15));
-        redisService.delete(RedisKey.VERIFY.getPrefix() + email);
         return verificationToken;
     }
 
@@ -123,7 +130,10 @@ public class EmailService {
             throw new InvalidVerificationTokenException("인증 토큰이 올바르지 않거나 만료되었습니다.");
         }
 
+        // 정방향 + 역방향 키 모두 삭제 (토큰 1회용, 재설정 완료 후 정리)
         redisService.delete(RedisKey.PASSWORD_RESET.getPrefix() + token);
+        redisService.delete(RedisKey.PASSWORD_RESET_BY_EMAIL.getPrefix() + savedEmail);
+
         return savedEmail;
     }
 

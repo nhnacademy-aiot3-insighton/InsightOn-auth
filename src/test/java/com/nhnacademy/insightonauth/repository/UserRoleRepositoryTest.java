@@ -23,28 +23,43 @@ class UserRoleRepositoryTest {
     @Autowired
     private UserRepository userRepository;
 
-    private User user;
+    private User user1;
+    private User user2;
 
     @BeforeEach
     void setUp() {
-        user = new User("test@test.com", "test", "01012345678");
-        userRepository.save(user);
-        userRoleRepository.save(new UserRole(user, Role.MEMBER));
+        user1 = new User("test@test.com", "test", "01012345678");
+        userRepository.save(user1);
+        userRoleRepository.save(new UserRole(user1, Role.MEMBER));
+
+        user2 = new User("other@test.com", "other", "01099998888");
+        userRepository.save(user2);
+        userRoleRepository.save(new UserRole(user2, Role.MEMBER));
+        userRoleRepository.save(new UserRole(user2, Role.ADMIN));
     }
 
     @Test
-    @DisplayName("user로 권한 목록 조회")
-    void findByUser_returnsRoles() {
-        List<UserRole> result = userRoleRepository.findByUser(user);
+    @DisplayName("user로 권한 목록 조회, 다른 사용자 제외 확인")
+    void findByUser_returnsOnlyOwnRoles() {
+        List<UserRole> result = userRoleRepository.findByUser(user1);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getRole()).isEqualTo(Role.MEMBER);
+        assertThat(result.get(0).getUser().getUserId()).isEqualTo(user1.getUserId());
+    }
+
+    @Test
+    @DisplayName("다중 권한 사용자 목록 조회")
+    void findByUser_otherUserHasMultipleRoles() {
+        List<UserRole> result = userRoleRepository.findByUser(user2);
+
+        assertThat(result).hasSize(2);
     }
 
     @Test
     @DisplayName("user, role로 존재 여부 확인 - true")
     void existsByUserAndRole_returnsTrueWhenExists() {
-        boolean exists = userRoleRepository.existsByUserAndRole(user, Role.MEMBER);
+        boolean exists = userRoleRepository.existsByUserAndRole(user1, Role.MEMBER);
 
         assertThat(exists).isTrue();
     }
@@ -52,7 +67,15 @@ class UserRoleRepositoryTest {
     @Test
     @DisplayName("user, role로 존재 여부 확인 - false")
     void existsByUserAndRole_returnsFalseWhenNotExists() {
-        boolean exists = userRoleRepository.existsByUserAndRole(user, Role.ADMIN);
+        boolean exists = userRoleRepository.existsByUserAndRole(user1, Role.ADMIN);
+
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    @DisplayName("다른 사용자 역할 미포함 확인")
+    void existsByUserAndRole_doesNotMixOtherUsersRole() {
+        boolean exists = userRoleRepository.existsByUserAndRole(user1, Role.ADMIN);
 
         assertThat(exists).isFalse();
     }
@@ -60,16 +83,19 @@ class UserRoleRepositoryTest {
     @Test
     @DisplayName("user, role로 권한 조회")
     void findByUserAndRole_returnsUserRole() {
-        Optional<UserRole> found = userRoleRepository.findByUserAndRole(user, Role.MEMBER);
+        Optional<UserRole> found = userRoleRepository.findByUserAndRole(user1, Role.MEMBER);
 
-        assertThat(found).isPresent();
-        assertThat(found.get().getUser()).isEqualTo(user);
+        assertThat(found)
+                .isPresent()
+                .get()
+                .extracting(userRole -> userRole.getUser().getUserId())
+                .isEqualTo(user1.getUserId());
     }
 
     @Test
-    @DisplayName("없는 role로 조회 시 빈 값 반환")
+    @DisplayName("없는 role로 조회")
     void findByUserAndRole_whenNotExists_returnsEmpty() {
-        Optional<UserRole> found = userRoleRepository.findByUserAndRole(user, Role.ADMIN);
+        Optional<UserRole> found = userRoleRepository.findByUserAndRole(user1, Role.ADMIN);
 
         assertThat(found).isEmpty();
     }

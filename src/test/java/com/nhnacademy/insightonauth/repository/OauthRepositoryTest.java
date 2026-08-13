@@ -13,7 +13,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
-
 @DataJpaTest
 class OauthRepositoryTest {
 
@@ -23,19 +22,24 @@ class OauthRepositoryTest {
     @Autowired
     private UserRepository userRepository;
 
-    private User user;
+    private User user1;
+    private User user2;
 
     @BeforeEach
     void setUp() {
-        user = new User("test@test.com", "test", "01012345678");
-        userRepository.save(user);
-        oauthRepository.save(new Oauth(user, "google", "google-provider-id-123"));
+        user1 = new User("test@test.com", "test", "01012345678");
+        userRepository.save(user1);
+        oauthRepository.save(new Oauth(user1, "google", "google-provider-id-123"));
+
+        user2 = new User("other@test.com", "other", "01099998888");
+        userRepository.save(user2);
+        oauthRepository.save(new Oauth(user2, "google", "other-provider-id"));
     }
 
     @Test
     @DisplayName("user, provider로 연동 정보 조회")
     void findByUserAndProvider_returnsOauth() {
-        Optional<Oauth> found = oauthRepository.findByUserAndProvider(user, "google");
+        Optional<Oauth> found = oauthRepository.findByUserAndProvider(user1, "google");
 
         assertThat(found)
                 .isPresent()
@@ -45,9 +49,9 @@ class OauthRepositoryTest {
     }
 
     @Test
-    @DisplayName("연동 없는 provider 조회 시 빈 값 반환")
+    @DisplayName("연동 없는 provider 조회")
     void findByUserAndProvider_whenNotExists_returnsEmpty() {
-        Optional<Oauth> found = oauthRepository.findByUserAndProvider(user, "github");
+        Optional<Oauth> found = oauthRepository.findByUserAndProvider(user1, "github");
 
         assertThat(found).isEmpty();
     }
@@ -61,11 +65,11 @@ class OauthRepositoryTest {
                 .isPresent()
                 .get()
                 .extracting(oauth -> oauth.getUser().getUserId())
-                .isEqualTo(user.getUserId());
+                .isEqualTo(user1.getUserId());
     }
 
     @Test
-    @DisplayName("없는 providerUserId 조회 시 빈 값 반환")
+    @DisplayName("없는 providerUserId 조회")
     void findByProviderAndProviderUserId_whenNotExists_returnsEmpty() {
         Optional<Oauth> found = oauthRepository.findByProviderAndProviderUserId("google", "not-exist-id");
 
@@ -73,32 +77,33 @@ class OauthRepositoryTest {
     }
 
     @Test
-    @DisplayName("user로 연동 목록 조회")
-    void findByUser_returnsOauthList() {
-        List<Oauth> result = oauthRepository.findByUser(user);
+    @DisplayName("user로 연동 목록 조회, 다른 사용자 제외 확인")
+    void findByUser_returnsOnlyOwnOauthList() {
+        List<Oauth> result = oauthRepository.findByUser(user1);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getProvider()).isEqualTo("google");
+        assertThat(result.get(0).getUser().getUserId()).isEqualTo(user1.getUserId());
     }
 
     @Test
-    @DisplayName("user로 연동 개수 조회")
-    void countByUser_returnsCount() {
-        oauthRepository.save(new Oauth(user, "github", "github-provider-id-456"));
+    @DisplayName("user로 연동 개수 조회, 다른 사용자 제외 확인")
+    void countByUser_excludesOtherUserOauths() {
+        oauthRepository.save(new Oauth(user1, "github", "github-provider-id-456"));
 
-        Long count = oauthRepository.countByUser(user);
+        Long count = oauthRepository.countByUser(user1);
 
         assertThat(count).isEqualTo(2L);
     }
 
     @Test
-    @DisplayName("user로 연동 정보 전체 삭제")
-    void deleteByUser_removesAllOauths() {
-        oauthRepository.save(new Oauth(user, "github", "github-provider-id-456"));
+    @DisplayName("user로 연동 정보 전체 삭제, 다른 사용자 유지 확인")
+    void deleteByUser_removesOnlyOwnOauths() {
+        oauthRepository.save(new Oauth(user1, "github", "github-provider-id-456"));
 
-        oauthRepository.deleteByUser(user);
+        oauthRepository.deleteByUser(user1);
 
-        List<Oauth> result = oauthRepository.findByUser(user);
-        assertThat(result).isEmpty();
+        assertThat(oauthRepository.findByUser(user1)).isEmpty();
+        assertThat(oauthRepository.findByUser(user2)).hasSize(1);
     }
 }

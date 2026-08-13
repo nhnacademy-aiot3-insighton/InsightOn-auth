@@ -17,4 +17,6 @@ public interface MyPageService {
     List<OauthResponse> findMyOauths(Long userId);
 
     void linkOauth(Long userId, String provider, String code);
+
+    void mergeAccount(Long primaryUserId, Long secondaryUserId, String provider, String providerUserId);
 }
