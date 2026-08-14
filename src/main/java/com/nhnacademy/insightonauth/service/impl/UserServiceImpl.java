@@ -17,6 +17,7 @@ import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.*;
 import com.nhnacademy.insightonauth.util.PhoneNumberUtil;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -158,12 +159,17 @@ public class UserServiceImpl implements UserService {
     //front에서 access, refresh token 제거
     //여기선 refresh만 redis에서 제거
     @Override
-    public void logout(Long userId) {
+    public void logout(Long userId, String accessToken) {
+        // 리프레시 삭제
         redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
+
+        // 블랙리스트 등록
+        blacklistToken(accessToken);
     }
 
     @Override
     public void forceLogout(Long userId) {
+        // 강제 로그아웃의 경우 access를 짧게 주었기 때문에 리프레시 삭제만으로 일단 결정
         redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
     }
 
@@ -294,7 +300,7 @@ public class UserServiceImpl implements UserService {
 
     //탈톼시 비밀번호 확인
     @Override
-    public void withdraw(Long userId) {
+    public void withdraw(Long userId, String accessToken) {
         User user = findById(userId);
 
         if (user.getStatus() == Status.WITHDRAW) {
@@ -316,6 +322,7 @@ public class UserServiceImpl implements UserService {
 
         user.withdraw();
         redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
+        blacklistToken(accessToken);
     }
 
     @Override
@@ -435,6 +442,11 @@ public class UserServiceImpl implements UserService {
                 Status.ACTIVE, OffsetDateTime.now(ZoneOffset.UTC).minusDays(30));
     }
 
+    @Override
+    public boolean isBlacklisted(String jti) {
+        return redisService.hasKey(RedisKey.BLACKLIST.getPrefix() + jti);
+    }
+
     private User findActiveUser(Long userId) {
         User user = findById(userId);
         if (user.getStatus() != Status.ACTIVE) {
@@ -512,6 +524,16 @@ public class UserServiceImpl implements UserService {
         } else {
             redisService.set(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email,
                     String.valueOf(count), Duration.ofMinutes(30));
+        }
+    }
+
+    private void blacklistToken(String accessToken) {
+        // 액세스 토큰을 블랙리스트에 등록
+        Claims claims = jwtProvider.parse(accessToken);
+        String jti = claims.getId();
+        long remainingMs = claims.getExpiration().getTime() - System.currentTimeMillis();
+        if (remainingMs > 0) {
+            redisService.set(RedisKey.BLACKLIST.getPrefix() + jti, "1", Duration.ofMillis(remainingMs));
         }
     }
 }
