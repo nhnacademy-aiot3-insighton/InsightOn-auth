@@ -27,7 +27,7 @@ public interface UserService {
 
     UserLoginResponse login(String email, String password);
 
-    void logout(Long userId);
+    void logout(Long userId, String accessToken);
 
     void forceLogout(Long userId);
 
@@ -49,7 +49,7 @@ public interface UserService {
 
     void activate(Long userId);
 
-    void withdraw(Long userId);
+    void withdraw(Long userId, String accessToken);
 
     void sleep(Long userId);
 
@@ -64,4 +64,6 @@ public interface UserService {
     List<User> findExpiredWithdrawnUsers();
 
     List<User> findInactiveUsers();
+
+    boolean isBlacklisted(String jti);
 }

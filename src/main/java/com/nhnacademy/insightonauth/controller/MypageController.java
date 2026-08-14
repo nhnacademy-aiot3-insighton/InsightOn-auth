@@ -51,8 +51,11 @@ public class MypageController {
 
     // 탈퇴
     @DeleteMapping("/me")
-    public ResponseEntity<Void> withdraw(@RequestHeader(name = X_USER_ID) @Valid Long userId) {
-        userService.withdraw(userId);
+    public ResponseEntity<Void> withdraw(
+            @RequestHeader(name = X_USER_ID) @Valid Long userId,
+            @RequestHeader("Authorization") String token) {
+        String accessToken = token.replace("Bearer ", "");
+        userService.withdraw(userId, accessToken);
         return ResponseEntity.noContent().build();
     }
 
