@@ -335,6 +335,9 @@ public class UserServiceImpl implements UserService {
 
         user.setStatus(Status.SLEEP);
         user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+
+        // 차단 시 리프레시 삭제 — 재발급 차단
+        redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
     }
 
     @Override
@@ -348,6 +351,9 @@ public class UserServiceImpl implements UserService {
 
         user.setStatus(Status.BLOCK);
         user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+
+        // 차단 시 리프레시 삭제 — 재발급 차단
+        redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
     }
 
     @Override
