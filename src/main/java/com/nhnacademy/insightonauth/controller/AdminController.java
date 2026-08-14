@@ -69,7 +69,8 @@ public class AdminController {
 
     // 강제 로그아웃
     @PostMapping("/users/{userId}/force-logout")
-    public ResponseEntity<Void> forceLogout(@PathVariable Long userId) {
+    public ResponseEntity<Void> forceLogout(
+            @PathVariable Long userId) {
         adminUserService.forceLogout(userId);
         return ResponseEntity.noContent().build();
     }

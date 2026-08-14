@@ -5,6 +5,8 @@ import com.nhnacademy.insightonauth.dto.oauth.OauthLoginRequest;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.service.UserService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -81,8 +83,11 @@ public class UserController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> doLogout(@RequestHeader(name = X_USER_ID) @Valid Long userId) {
-        userService.logout(userId);
+    public ResponseEntity<Void> doLogout(
+            @RequestHeader(name = X_USER_ID) @Valid Long userId,
+            @RequestHeader("Authorization") String token) {
+        String accessToken = token.replace("Bearer ", "");
+        userService.logout(userId, accessToken);
         return ResponseEntity.noContent().build();
     }
 
@@ -146,5 +151,12 @@ public class UserController {
         TokenRefreshResponse tokenRefreshResponse = userService.refresh(userId, refreshToken);
 
         return ResponseEntity.ok(tokenRefreshResponse);
+    }
+
+    @GetMapping("/tokens/{jti}/blacklisted")
+    public ResponseEntity<Boolean> blacklistedCheck(
+            @PathVariable("jti") @NotBlank String jti) {
+        boolean blacklisted = userService.isBlacklisted(jti);
+        return ResponseEntity.ok(blacklisted);
     }
 }
