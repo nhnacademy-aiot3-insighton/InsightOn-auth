@@ -18,6 +18,7 @@ import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.*;
 import com.nhnacademy.insightonauth.util.PhoneNumberUtil;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -534,12 +535,19 @@ public class UserServiceImpl implements UserService {
     }
 
     private void blacklistToken(String accessToken) {
-        // 액세스 토큰을 블랙리스트에 등록
-        Claims claims = jwtProvider.parse(accessToken);
-        String jti = claims.getId();
-        long remainingMs = claims.getExpiration().getTime() - System.currentTimeMillis();
-        if (remainingMs > 0) {
-            redisService.set(RedisKey.BLACKLIST.getPrefix() + jti, "1", Duration.ofMillis(remainingMs));
+        try {
+            Claims claims = jwtProvider.parse(accessToken);
+            String jti = claims.getId();
+            long remainingMs = claims.getExpiration().getTime() - System.currentTimeMillis();
+            if (remainingMs > 0) {
+                redisService.set(RedisKey.BLACKLIST.getPrefix() + jti, "1", Duration.ofMillis(remainingMs));
+            }
+        } catch (ExpiredJwtException e) {
+            // 이미 만료된 토큰 — 블랙리스트 등록 불필요, 조용히 넘어감
+            log.debug("이미 만료된 토큰이라 블랙리스트 등록을 건너뜁니다.");
+        } catch (JwtException e) {
+            // 서명 오류 등 기타 유효하지 않은 토큰 — 마찬가지로 무시 가능
+            log.warn("유효하지 않은 토큰으로 블랙리스트 등록 시도: {}", e.getMessage());
         }
     }
 }
