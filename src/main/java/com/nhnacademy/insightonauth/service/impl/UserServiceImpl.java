@@ -14,6 +14,7 @@ import com.nhnacademy.insightonauth.exception.*;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
+import com.nhnacademy.insightonauth.redis.ResendCounter;
 import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.*;
 import com.nhnacademy.insightonauth.util.PhoneNumberUtil;
@@ -52,6 +53,7 @@ public class UserServiceImpl implements UserService {
     private final OauthService oauthService;
     private final CoreClient coreClient;
     private final TokenBlacklistService tokenBlacklistService;
+    private final ResendCounter resendCounter;
 
     @Override
     public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken) {
@@ -101,7 +103,13 @@ public class UserServiceImpl implements UserService {
         emailService.sendVerificationCode(email);
 
         // 4. 카운터 증가
-        increaseResendCount(email);
+        // emailVerifyRequest 안에서
+        resendCounter.increase(
+                RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email,
+                RedisKey.VERIFY_RESEND_LOCK.getPrefix() + email,
+                5,
+                Duration.ofMinutes(15)
+        );
     }
 
     @Override
@@ -219,7 +227,13 @@ public class UserServiceImpl implements UserService {
 
         // 2. 연타 방지/카운터 기록 — 계정 여부와 무관하게 항상 (열거 방지 핵심)
         redisService.set(RedisKey.PASSWORD_RESET_RESEND_COOLDOWN.getPrefix() + email, "1", Duration.ofSeconds(60));
-        increasePasswordResetResendCount(email);
+        // passwordResetRequest 안에서
+        resendCounter.increase(
+                RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email,
+                RedisKey.PASSWORD_RESET_RESEND_LOCK.getPrefix() + email,
+                5,
+                Duration.ofMinutes(15)
+        );
 
         // 3. 실제 메일 발송만 계정 있고 정상일 때 (없어도 예외 안 던짐)
         userRepository.findByEmail(email).ifPresent(user -> {
@@ -497,32 +511,5 @@ public class UserServiceImpl implements UserService {
 
         return UserLoginResponse.pendingRestore(restoreToken);
 
-    }
-
-    private void increaseResendCount(String email) {
-        String saved = redisService.get(RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email);
-        int count = (saved == null || saved.isBlank()) ? 0 : Integer.parseInt(saved);
-        count++;
-
-        if (count >= 5) {
-            redisService.delete(RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email);
-            redisService.set(RedisKey.VERIFY_RESEND_LOCK.getPrefix() + email, "locked", Duration.ofMinutes(30));
-        } else {
-            redisService.set(RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email,
-                    String.valueOf(count), Duration.ofMinutes(30));
-        }
-    }
-
-    private void increasePasswordResetResendCount(String email) {
-        String saved = redisService.get(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email);
-        int count = (saved == null || saved.isBlank()) ? 0 : Integer.parseInt(saved);
-        count++;
-        if (count >= 5) {
-            redisService.delete(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email);
-            redisService.set(RedisKey.PASSWORD_RESET_RESEND_LOCK.getPrefix() + email, "locked", Duration.ofMinutes(30));
-        } else {
-            redisService.set(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email,
-                    String.valueOf(count), Duration.ofMinutes(30));
-        }
     }
 }
