@@ -9,6 +9,7 @@ import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.service.MyPageService;
 import com.nhnacademy.insightonauth.service.OauthService;
+import com.nhnacademy.insightonauth.service.UserManagementService;
 import com.nhnacademy.insightonauth.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,9 +26,9 @@ public class MypageController {
 
     private static final String X_USER_ID = "X-User-Id";
 
-    private final UserService userService;
     private final OauthService oauthService;
     private final MyPageService myPageService;
+    private final UserManagementService userManagementService;
 
     // 내 정보 조회
     @GetMapping("/me")
@@ -44,8 +45,8 @@ public class MypageController {
             @RequestHeader(name = X_USER_ID) @Valid Long userId,
             @RequestBody @Valid MyInfoUpdateRequest request) {
 
-        userService.updateUserName(userId, request.name());
-        userService.updatePhoneNumber(userId, request.phoneNumber());
+        userManagementService.updateUserName(userId, request.name());
+        userManagementService.updatePhoneNumber(userId, request.phoneNumber());
         return ResponseEntity.ok().build();
     }
 
@@ -55,7 +56,7 @@ public class MypageController {
             @RequestHeader(name = X_USER_ID) @Valid Long userId,
             @RequestHeader("Authorization") String token) {
         String accessToken = token.replace("Bearer ", "");
-        userService.withdraw(userId, accessToken);
+        userManagementService.withdraw(userId, accessToken);
         return ResponseEntity.noContent().build();
     }
 
@@ -104,7 +105,7 @@ public class MypageController {
             @RequestHeader(name = X_USER_ID) @Valid Long userId,
             @PathVariable Long oauthId) {
 
-        User user = userService.findById(userId);
+        User user = userManagementService.findById(userId);
         oauthService.delete(user, oauthId);
         return ResponseEntity.noContent().build();
     }

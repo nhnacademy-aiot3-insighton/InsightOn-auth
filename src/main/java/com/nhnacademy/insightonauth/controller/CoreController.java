@@ -2,6 +2,7 @@ package com.nhnacademy.insightonauth.controller;
 
 import com.nhnacademy.insightonauth.dto.core.AuthUserResponse;
 import com.nhnacademy.insightonauth.entity.User;
+import com.nhnacademy.insightonauth.service.UserManagementService;
 import com.nhnacademy.insightonauth.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -15,11 +16,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class CoreController {
 
-    private final UserService userService;
+    private final UserManagementService userManagementService;
 
     @GetMapping("{userId}")
     public ResponseEntity<AuthUserResponse> getUserById(@PathVariable("userId") Long userId) {
-        User user = userService.findById(userId);
+        User user = userManagementService.findById(userId);
 
         return ResponseEntity.ok(
                 new AuthUserResponse(user.getUserId(), user.getUserName(), user.getPhoneNumber(), user.getStatus()));
