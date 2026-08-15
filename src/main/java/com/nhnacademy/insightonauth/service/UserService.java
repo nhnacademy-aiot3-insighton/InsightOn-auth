@@ -64,6 +64,4 @@ public interface UserService {
     List<User> findExpiredWithdrawnUsers();
 
     List<User> findInactiveUsers();
-
-    boolean isBlacklisted(String jti);
 }
