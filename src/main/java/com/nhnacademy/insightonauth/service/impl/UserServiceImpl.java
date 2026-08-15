@@ -40,7 +40,7 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
 
     // Transactional 전파 필요없으면 빼기 어노테이션 붙이기
-    // private 메소드의 Transactional의 붙는 경우 proxy가 적용안 될수 있음
+    // private 메소드의 Transactional의 붙는 경우 proxy가 적용안되나 현재 private은 사용이 불필요
     private final UserRepository userRepository;
     private final UserCredentialService userCredentialService;
     private final UserRoleService userRoleService;
@@ -51,6 +51,7 @@ public class UserServiceImpl implements UserService {
     private final OauthClientResolver oauthClientResolver;
     private final OauthService oauthService;
     private final CoreClient coreClient;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Override
     public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken) {
@@ -165,7 +166,7 @@ public class UserServiceImpl implements UserService {
         redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
 
         // 블랙리스트 등록
-        blacklistToken(accessToken);
+        tokenBlacklistService.blacklistToken(accessToken);
     }
 
     @Override
@@ -323,7 +324,7 @@ public class UserServiceImpl implements UserService {
 
         user.withdraw();
         redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
-        blacklistToken(accessToken);
+        tokenBlacklistService.blacklistToken(accessToken);
     }
 
     @Override
@@ -414,7 +415,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public TokenRefreshResponse refresh(Long userId, String refreshToken) {
-        // base64 왜쓰는지
         try {
             jwtProvider.validateRefreshToken(userId, refreshToken);   // Redis의 jti와 대조 검증
         } catch (JwtException e) {
@@ -449,11 +449,6 @@ public class UserServiceImpl implements UserService {
                 Status.ACTIVE, OffsetDateTime.now(ZoneOffset.UTC).minusDays(30));
     }
 
-    @Override
-    public boolean isBlacklisted(String jti) {
-        return redisService.hasKey(RedisKey.BLACKLIST.getPrefix() + jti);
-    }
-
     private User findActiveUser(Long userId) {
         User user = findById(userId);
         if (user.getStatus() != Status.ACTIVE) {
@@ -478,15 +473,12 @@ public class UserServiceImpl implements UserService {
 
     private UserLoginResponse issueTokens(User user, String email) {
         List<UserRole> userRoleList = userRoleService.findByUser(user);
+        List<String> roles = userRoleList.stream()
+                .map(userRole -> userRole.getRole().name())
+                .toList();
 
-        String accessToken = jwtProvider.createAccessToken(
-                user.getUserId(), userRoleList.stream()
-                        .map(userRole -> userRole.getRole().name())
-                        .toList());
-        String refreshToken = jwtProvider.createRefreshToken(
-                user.getUserId(), userRoleList.stream()
-                        .map(userRole -> userRole.getRole().name())
-                        .toList());
+        String accessToken = jwtProvider.createAccessToken(user.getUserId(), roles);
+        String refreshToken = jwtProvider.createRefreshToken(user.getUserId(), roles);
 
         redisService.delete(RedisKey.LOGIN_LOCK.getPrefix() + email);
         redisService.delete(RedisKey.LOGIN_FAIL.getPrefix() + email);
@@ -531,23 +523,6 @@ public class UserServiceImpl implements UserService {
         } else {
             redisService.set(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email,
                     String.valueOf(count), Duration.ofMinutes(30));
-        }
-    }
-
-    private void blacklistToken(String accessToken) {
-        try {
-            Claims claims = jwtProvider.parse(accessToken);
-            String jti = claims.getId();
-            long remainingMs = claims.getExpiration().getTime() - System.currentTimeMillis();
-            if (remainingMs > 0) {
-                redisService.set(RedisKey.BLACKLIST.getPrefix() + jti, "1", Duration.ofMillis(remainingMs));
-            }
-        } catch (ExpiredJwtException e) {
-            // 이미 만료된 토큰 — 블랙리스트 등록 불필요, 조용히 넘어감
-            log.debug("이미 만료된 토큰이라 블랙리스트 등록을 건너뜁니다.");
-        } catch (JwtException e) {
-            // 서명 오류 등 기타 유효하지 않은 토큰 — 마찬가지로 무시 가능
-            log.warn("유효하지 않은 토큰으로 블랙리스트 등록 시도: {}", e.getMessage());
         }
     }
 }
