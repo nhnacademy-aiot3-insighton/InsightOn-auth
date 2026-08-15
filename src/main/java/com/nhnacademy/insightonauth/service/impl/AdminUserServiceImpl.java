@@ -69,16 +69,20 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
-    public void changeStatus(Long userId, Status status) {
-        User user = userService.findById(userId);   // 여기도 UserService 경유
-        user.setStatus(status);
-        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-
-        // BLOCK 이면 현재 refresh를 삭제
-        if (status == Status.BLOCK) {
-            redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
-        }
+    public void block(Long userId) {
+        userService.block(userId);
     }
+
+    @Override
+    public void sleep(Long userId) {
+        userService.sleep(userId);
+    }
+
+    @Override
+    public void activate(Long userId) {
+        userService.activate(userId);
+    }
+
 
     @Override
     public void addUserRole(Long userId, Role role) {
@@ -95,13 +99,6 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Override
     public void forceLogout(Long userId) {
         userService.forceLogout(userId);
-    }
-
-    // 관리자가 계정 삭제
-    @Override
-    public void deleteUser(Long userId) {
-        User user = userService.findById(userId);
-        userRepository.delete(user);
     }
 
 }

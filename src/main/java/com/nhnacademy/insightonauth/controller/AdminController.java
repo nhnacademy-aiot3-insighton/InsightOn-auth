@@ -40,14 +40,25 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
-    // 회원 상태 변경
-    @PutMapping("/users/{userId}/status")
-    public ResponseEntity<Void> changeStatus(
-            @PathVariable Long userId,
-            @RequestBody @Valid StatusChangeRequest request) {
+    // 회원 계정 차단
+    @PostMapping("/users/{userId}/block")
+    public ResponseEntity<Void> block(@PathVariable Long userId) {
+        adminUserService.block(userId);
+        return ResponseEntity.noContent().build();
+    }
 
-        adminUserService.changeStatus(userId, request.status());
-        return ResponseEntity.ok().build();
+    // 회원 계정 휴면 전환
+    @PostMapping("/users/{userId}/sleep")
+    public ResponseEntity<Void> sleep(@PathVariable Long userId) {
+        adminUserService.sleep(userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // 회원 계정 활성화 (복구)
+    @PostMapping("/users/{userId}/activate")
+    public ResponseEntity<Void> activate(@PathVariable Long userId) {
+        adminUserService.activate(userId);
+        return ResponseEntity.noContent().build();
     }
 
     // 회원 권한 변경
@@ -58,13 +69,6 @@ public class AdminController {
 
         adminUserService.addUserRole(userId, request.role());
         return ResponseEntity.ok().build();
-    }
-
-    // 회원 삭제 (실제로는 상태 변경 처리)
-    @DeleteMapping("/users/{userId}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long userId) {
-        adminUserService.deleteUser(userId);
-        return ResponseEntity.noContent().build();
     }
 
     // 강제 로그아웃
