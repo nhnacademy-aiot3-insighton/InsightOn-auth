@@ -14,10 +14,10 @@ import com.nhnacademy.insightonauth.exception.*;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
+import com.nhnacademy.insightonauth.redis.ResendCounter;
 import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.*;
 import com.nhnacademy.insightonauth.util.PhoneNumberUtil;
-import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +39,7 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
 
     // Transactional 전파 필요없으면 빼기 어노테이션 붙이기
-    // private 메소드의 Transactional의 붙는 경우 proxy가 적용안 될수 있음
+    // private 메소드의 Transactional의 붙는 경우 proxy가 적용안되나 현재 private은 사용이 불필요
     private final UserRepository userRepository;
     private final UserCredentialService userCredentialService;
     private final UserRoleService userRoleService;
@@ -50,6 +50,8 @@ public class UserServiceImpl implements UserService {
     private final OauthClientResolver oauthClientResolver;
     private final OauthService oauthService;
     private final CoreClient coreClient;
+    private final TokenBlacklistService tokenBlacklistService;
+    private final ResendCounter resendCounter;
 
     @Override
     public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken) {
@@ -99,7 +101,13 @@ public class UserServiceImpl implements UserService {
         emailService.sendVerificationCode(email);
 
         // 4. 카운터 증가
-        increaseResendCount(email);
+        // emailVerifyRequest 안에서
+        resendCounter.increase(
+                RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email,
+                RedisKey.VERIFY_RESEND_LOCK.getPrefix() + email,
+                5,
+                Duration.ofMinutes(15)
+        );
     }
 
     @Override
@@ -164,7 +172,7 @@ public class UserServiceImpl implements UserService {
         redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
 
         // 블랙리스트 등록
-        blacklistToken(accessToken);
+        tokenBlacklistService.blacklistToken(accessToken);
     }
 
     @Override
@@ -207,19 +215,33 @@ public class UserServiceImpl implements UserService {
     // 이러면 없는 계정은 응답이 더 빨리 나가기 때문에 공격자가 계정 존재 여부를 알 수 있음
     @Override
     public void passwordResetRequest(String email) {
-        // 1. 연타 방지/잠금 체크 — 계정 여부와 무관하게 항상
+        // 1. 잠금 체크 — 계정 여부와 무관하게 항상
         if (redisService.hasKey(RedisKey.PASSWORD_RESET_RESEND_LOCK.getPrefix() + email)) {
             throw new PasswordResetResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
         }
-        if (redisService.hasKey(RedisKey.PASSWORD_RESET_RESEND_COOLDOWN.getPrefix() + email)) {
+
+        // 2. 연타 방지 — hasKey+set 대신 원자적 setIfAbsent로 체크와 설정을 한 번에
+        boolean acquired = redisService.setIfAbsent(
+                RedisKey.PASSWORD_RESET_RESEND_COOLDOWN.getPrefix() + email,
+                "1",
+                Duration.ofSeconds(60)
+        );
+        if (!acquired) {
             throw new PasswordResetResendTooSoonException("잠시 후 다시 시도해 주세요.");
         }
 
-        // 2. 연타 방지/카운터 기록 — 계정 여부와 무관하게 항상 (열거 방지 핵심)
-        redisService.set(RedisKey.PASSWORD_RESET_RESEND_COOLDOWN.getPrefix() + email, "1", Duration.ofSeconds(60));
-        increasePasswordResetResendCount(email);
+        // 3. 카운터 증가 — 이번 요청으로 임계치에 도달해 잠겼으면 발송하지 않고 예외
+        boolean lockedNow = resendCounter.increase(
+                RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email,
+                RedisKey.PASSWORD_RESET_RESEND_LOCK.getPrefix() + email,
+                5,
+                Duration.ofMinutes(15)
+        );
+        if (lockedNow) {
+            throw new PasswordResetResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+        }
 
-        // 3. 실제 메일 발송만 계정 있고 정상일 때 (없어도 예외 안 던짐)
+        // 4. 실제 메일 발송만 계정 있고 정상일 때 (없어도 예외 안 던짐)
         userRepository.findByEmail(email).ifPresent(user -> {
             if (user.getStatus() == Status.WITHDRAW) {
                 return;   // 탈퇴 계정: 메일만 안 보냄 (rate limit은 이미 걸림)
@@ -322,7 +344,7 @@ public class UserServiceImpl implements UserService {
 
         user.withdraw();
         redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
-        blacklistToken(accessToken);
+        tokenBlacklistService.blacklistToken(accessToken);
     }
 
     @Override
@@ -413,7 +435,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public TokenRefreshResponse refresh(Long userId, String refreshToken) {
-        // base64 왜쓰는지
         try {
             jwtProvider.validateRefreshToken(userId, refreshToken);   // Redis의 jti와 대조 검증
         } catch (JwtException e) {
@@ -448,11 +469,6 @@ public class UserServiceImpl implements UserService {
                 Status.ACTIVE, OffsetDateTime.now(ZoneOffset.UTC).minusDays(30));
     }
 
-    @Override
-    public boolean isBlacklisted(String jti) {
-        return redisService.hasKey(RedisKey.BLACKLIST.getPrefix() + jti);
-    }
-
     private User findActiveUser(Long userId) {
         User user = findById(userId);
         if (user.getStatus() != Status.ACTIVE) {
@@ -477,15 +493,12 @@ public class UserServiceImpl implements UserService {
 
     private UserLoginResponse issueTokens(User user, String email) {
         List<UserRole> userRoleList = userRoleService.findByUser(user);
+        List<String> roles = userRoleList.stream()
+                .map(userRole -> userRole.getRole().name())
+                .toList();
 
-        String accessToken = jwtProvider.createAccessToken(
-                user.getUserId(), userRoleList.stream()
-                        .map(userRole -> userRole.getRole().name())
-                        .toList());
-        String refreshToken = jwtProvider.createRefreshToken(
-                user.getUserId(), userRoleList.stream()
-                        .map(userRole -> userRole.getRole().name())
-                        .toList());
+        String accessToken = jwtProvider.createAccessToken(user.getUserId(), roles);
+        String refreshToken = jwtProvider.createRefreshToken(user.getUserId(), roles);
 
         redisService.delete(RedisKey.LOGIN_LOCK.getPrefix() + email);
         redisService.delete(RedisKey.LOGIN_FAIL.getPrefix() + email);
@@ -504,42 +517,5 @@ public class UserServiceImpl implements UserService {
 
         return UserLoginResponse.pendingRestore(restoreToken);
 
-    }
-
-    private void increaseResendCount(String email) {
-        String saved = redisService.get(RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email);
-        int count = (saved == null || saved.isBlank()) ? 0 : Integer.parseInt(saved);
-        count++;
-
-        if (count >= 5) {
-            redisService.delete(RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email);
-            redisService.set(RedisKey.VERIFY_RESEND_LOCK.getPrefix() + email, "locked", Duration.ofMinutes(30));
-        } else {
-            redisService.set(RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email,
-                    String.valueOf(count), Duration.ofMinutes(30));
-        }
-    }
-
-    private void increasePasswordResetResendCount(String email) {
-        String saved = redisService.get(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email);
-        int count = (saved == null || saved.isBlank()) ? 0 : Integer.parseInt(saved);
-        count++;
-        if (count >= 5) {
-            redisService.delete(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email);
-            redisService.set(RedisKey.PASSWORD_RESET_RESEND_LOCK.getPrefix() + email, "locked", Duration.ofMinutes(30));
-        } else {
-            redisService.set(RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email,
-                    String.valueOf(count), Duration.ofMinutes(30));
-        }
-    }
-
-    private void blacklistToken(String accessToken) {
-        // 액세스 토큰을 블랙리스트에 등록
-        Claims claims = jwtProvider.parse(accessToken);
-        String jti = claims.getId();
-        long remainingMs = claims.getExpiration().getTime() - System.currentTimeMillis();
-        if (remainingMs > 0) {
-            redisService.set(RedisKey.BLACKLIST.getPrefix() + jti, "1", Duration.ofMillis(remainingMs));
-        }
     }
 }

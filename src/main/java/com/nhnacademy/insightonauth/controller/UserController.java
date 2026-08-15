@@ -4,9 +4,9 @@ import com.nhnacademy.insightonauth.dto.auth.*;
 import com.nhnacademy.insightonauth.dto.oauth.OauthLoginRequest;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.service.UserService;
+import com.nhnacademy.insightonauth.service.TokenBlacklistService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -24,6 +24,7 @@ public class UserController {
     private static final String X_USER_ID = "X-User-Id";
 
     private final UserService userService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @PostMapping("/email/verify-request")
     public ResponseEntity<Void> sendEmailVerify(@RequestBody @Valid EmailVerifyRequest emailVerifyRequest) {
@@ -156,7 +157,7 @@ public class UserController {
     @GetMapping("/tokens/{jti}/blacklisted")
     public ResponseEntity<Boolean> blacklistedCheck(
             @PathVariable("jti") @NotBlank String jti) {
-        boolean blacklisted = userService.isBlacklisted(jti);
+        boolean blacklisted = tokenBlacklistService.isBlacklisted(jti);
         return ResponseEntity.ok(blacklisted);
     }
 }

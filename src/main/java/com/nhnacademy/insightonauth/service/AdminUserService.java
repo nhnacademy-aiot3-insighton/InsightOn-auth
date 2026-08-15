@@ -14,15 +14,15 @@ public interface AdminUserService {
 
     AdminUserDetailResponse findUserDetail(Long userId);
 
-    void changeStatus(Long userId, Status status);
+    void block(Long userId);
+
+    void sleep(Long userId);
+
+    void activate(Long userId);
 
     void addUserRole(Long userId, Role role);
 
     void removeUserRole(Long userId, Role role);
 
     void forceLogout(Long userId);
-
-    // 강제 삭제시 유저가 group 관리자인 경우 생각
-    // group 관리를 넣는게 어떤가
-    void deleteUser(Long userId);
 }
