@@ -52,6 +52,7 @@ public class UserServiceImpl implements UserService {
     private final CoreClient coreClient;
     private final TokenBlacklistService tokenBlacklistService;
     private final ResendCounter resendCounter;
+    private final TokenService tokenService;
 
     @Override
     public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken) {
@@ -149,8 +150,8 @@ public class UserServiceImpl implements UserService {
         }
 
         if (user.getStatus() == Status.WITHDRAW) {
-            if (isWithinRestorePeriod(user)) {
-                return handleWithdrawnLogin(user);
+            if (tokenService.isWithinRestorePeriod(user)) {
+                return tokenService.handleWithdrawnLogin(user);
             }
             throw new RestorePeriodExpiredException("탈퇴 복구 가능 기간(7일)이 지났습니다.");
         }
@@ -161,7 +162,7 @@ public class UserServiceImpl implements UserService {
 
         user.updateLastLoginAt();
 
-        return issueTokens(user, email);
+        return tokenService.issueTokens(user, email);
     }
 
     //front에서 access, refresh token 제거
@@ -194,7 +195,7 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
         user.reactivate();
 
-        return issueTokens(user, email);
+        return tokenService.issueTokens(user, email);
     }
 
     @Override
@@ -209,7 +210,7 @@ public class UserServiceImpl implements UserService {
 
         redisService.delete(RedisKey.REACTIVE.getPrefix() + reactiveToken);
 
-        return issueTokens(user, user.getEmail());
+        return tokenService.issueTokens(user, user.getEmail());
     }
 
     // 이러면 없는 계정은 응답이 더 빨리 나가기 때문에 공격자가 계정 존재 여부를 알 수 있음
@@ -403,8 +404,8 @@ public class UserServiceImpl implements UserService {
             User user = existingOauth.get().getUser();
             // 탈퇴 상태 체크
             if (user.getStatus() == Status.WITHDRAW) {
-                if (isWithinRestorePeriod(user)) {
-                    return handleWithdrawnLogin(user);
+                if (tokenService.isWithinRestorePeriod(user)) {
+                    return tokenService.handleWithdrawnLogin(user);
                 }
                 throw new RestorePeriodExpiredException("탈퇴 복구 가능 기간(7일)이 지났습니다.");
             }
@@ -414,7 +415,7 @@ public class UserServiceImpl implements UserService {
             }
 
             user.updateLastLoginAt();
-            return issueTokens(user, user.getEmail());
+            return tokenService.issueTokens(user, user.getEmail());
         }
 
         // 새 User 만들기 전에, 이 이메일이 이미 가입돼 있는지 확인
@@ -430,7 +431,7 @@ public class UserServiceImpl implements UserService {
         oauthService.create(newUser, provider, userInfo.providerId());
         newUser.updateLastLoginAt();
 
-        return issueTokens(newUser, userInfo.email());
+        return tokenService.issueTokens(newUser, userInfo.email());
     }
 
     @Override
@@ -489,33 +490,5 @@ public class UserServiceImpl implements UserService {
         } else {
             redisService.set(RedisKey.LOGIN_FAIL.getPrefix() + email, String.valueOf(failCount), Duration.ofMinutes(5));
         }
-    }
-
-    private UserLoginResponse issueTokens(User user, String email) {
-        List<UserRole> userRoleList = userRoleService.findByUser(user);
-        List<String> roles = userRoleList.stream()
-                .map(userRole -> userRole.getRole().name())
-                .toList();
-
-        String accessToken = jwtProvider.createAccessToken(user.getUserId(), roles);
-        String refreshToken = jwtProvider.createRefreshToken(user.getUserId(), roles);
-
-        redisService.delete(RedisKey.LOGIN_LOCK.getPrefix() + email);
-        redisService.delete(RedisKey.LOGIN_FAIL.getPrefix() + email);
-        return UserLoginResponse.success(accessToken, refreshToken);
-    }
-
-    private boolean isWithinRestorePeriod(User user) {
-        OffsetDateTime deadline = user.getWithdrawnAt().plusDays(7);
-        return OffsetDateTime.now(ZoneOffset.UTC).isBefore(deadline);
-    }
-
-    private UserLoginResponse handleWithdrawnLogin(User user) {
-        String restoreToken = UUID.randomUUID().toString();
-        redisService.set(RedisKey.REACTIVE.getPrefix() + restoreToken,
-                user.getUserId().toString(), Duration.ofMinutes(10));
-
-        return UserLoginResponse.pendingRestore(restoreToken);
-
     }
 }
