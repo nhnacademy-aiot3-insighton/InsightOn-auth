@@ -38,7 +38,9 @@ public enum ErrorCode {
     // 비밀번호 재설정 메일 재전송 — 연타 방지(쿨다운)
     PASSWORD_RESET_RESEND_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS),
     // 비밀번호 재설정 메일 재전송 — 횟수 초과 잠금
-    PASSWORD_RESET_RESEND_LOCKED(HttpStatus.LOCKED);
+    PASSWORD_RESET_RESEND_LOCKED(HttpStatus.LOCKED),
+
+    REDIS_OPERATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE);
 
     private final HttpStatus status;
 

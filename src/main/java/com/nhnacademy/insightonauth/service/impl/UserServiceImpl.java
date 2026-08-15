@@ -18,8 +18,6 @@ import com.nhnacademy.insightonauth.redis.ResendCounter;
 import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.*;
 import com.nhnacademy.insightonauth.util.PhoneNumberUtil;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -217,25 +215,33 @@ public class UserServiceImpl implements UserService {
     // 이러면 없는 계정은 응답이 더 빨리 나가기 때문에 공격자가 계정 존재 여부를 알 수 있음
     @Override
     public void passwordResetRequest(String email) {
-        // 1. 연타 방지/잠금 체크 — 계정 여부와 무관하게 항상
+        // 1. 잠금 체크 — 계정 여부와 무관하게 항상
         if (redisService.hasKey(RedisKey.PASSWORD_RESET_RESEND_LOCK.getPrefix() + email)) {
             throw new PasswordResetResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
         }
-        if (redisService.hasKey(RedisKey.PASSWORD_RESET_RESEND_COOLDOWN.getPrefix() + email)) {
+
+        // 2. 연타 방지 — hasKey+set 대신 원자적 setIfAbsent로 체크와 설정을 한 번에
+        boolean acquired = redisService.setIfAbsent(
+                RedisKey.PASSWORD_RESET_RESEND_COOLDOWN.getPrefix() + email,
+                "1",
+                Duration.ofSeconds(60)
+        );
+        if (!acquired) {
             throw new PasswordResetResendTooSoonException("잠시 후 다시 시도해 주세요.");
         }
 
-        // 2. 연타 방지/카운터 기록 — 계정 여부와 무관하게 항상 (열거 방지 핵심)
-        redisService.set(RedisKey.PASSWORD_RESET_RESEND_COOLDOWN.getPrefix() + email, "1", Duration.ofSeconds(60));
-        // passwordResetRequest 안에서
-        resendCounter.increase(
+        // 3. 카운터 증가 — 이번 요청으로 임계치에 도달해 잠겼으면 발송하지 않고 예외
+        boolean lockedNow = resendCounter.increase(
                 RedisKey.PASSWORD_RESET_RESEND_COUNT.getPrefix() + email,
                 RedisKey.PASSWORD_RESET_RESEND_LOCK.getPrefix() + email,
                 5,
                 Duration.ofMinutes(15)
         );
+        if (lockedNow) {
+            throw new PasswordResetResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+        }
 
-        // 3. 실제 메일 발송만 계정 있고 정상일 때 (없어도 예외 안 던짐)
+        // 4. 실제 메일 발송만 계정 있고 정상일 때 (없어도 예외 안 던짐)
         userRepository.findByEmail(email).ifPresent(user -> {
             if (user.getStatus() == Status.WITHDRAW) {
                 return;   // 탈퇴 계정: 메일만 안 보냄 (rate limit은 이미 걸림)

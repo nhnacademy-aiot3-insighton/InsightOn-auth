@@ -1,4 +1,4 @@
-package com.nhnacademy.insightonauth.service.impl;
+package com.nhnacademy.insightonauth.service;
 
 public interface TokenBlacklistService {
     boolean isBlacklisted(String jti);
