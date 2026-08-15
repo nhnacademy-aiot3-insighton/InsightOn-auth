@@ -5,8 +5,6 @@ import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.client.OauthClientResolver;
 import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
-import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
-import com.nhnacademy.insightonauth.dto.core.ManagerGroupExistsResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.*;
@@ -17,7 +15,6 @@ import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.redis.ResendCounter;
 import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.*;
-import com.nhnacademy.insightonauth.util.PhoneNumberUtil;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +27,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -49,35 +45,10 @@ public class UserServiceImpl implements UserService {
     private final EmailService emailService;
     private final OauthClientResolver oauthClientResolver;
     private final OauthService oauthService;
-    private final CoreClient coreClient;
     private final TokenBlacklistService tokenBlacklistService;
     private final ResendCounter resendCounter;
     private final TokenService tokenService;
-
-    @Override
-    public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken) {
-        if (userRepository.existsByEmail(email)) {
-            throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
-        }
-        emailService.emailVerifyCheck(email, verificationToken);
-
-        String normalized = PhoneNumberUtil.normalize(phoneNumber);
-        if (normalized != null && userRepository.existsByPhoneNumber(normalized)) {
-            throw new DuplicatePhoneNumberException("이미 사용 중인 전화번호입니다.");
-        }
-
-        User user = new User(email, userName, normalized);
-        userRepository.save(user);
-        userCredentialService.create(user, password);
-        userRoleService.create(user, role);
-
-        return new UserSignupResponse(user.getEmail(), user.getUserName(), user.getPhoneNumber(), user.getCreatedAt());
-    }
-
-    @Override
-    public boolean checkEmailAvailable(String email) {
-        return !userRepository.existsByEmail(email);
-    }
+    private final UserManagementService userManagementService;
 
     @Override
     public void emailVerifyRequest(String email) {
@@ -114,20 +85,6 @@ public class UserServiceImpl implements UserService {
     @Override
     public String emailVerifyConfirm(String email, String code) {
         return emailService.emailCodeVerify(email, code);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public User findById(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public User findByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
     }
 
     @Override
@@ -191,8 +148,7 @@ public class UserServiceImpl implements UserService {
     public UserLoginResponse reactivateConfirm(String email, String code) {
         emailService.emailCodeVerify(email, code);
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
+        User user = userManagementService.findByEmail(email);
         user.reactivate();
 
         return tokenService.issueTokens(user, email);
@@ -205,7 +161,7 @@ public class UserServiceImpl implements UserService {
             throw new InvalidReactiveTokenException("복구 요청이 유효하지 않거나 만료되었습니다.");
         }
 
-        User user = findById(Long.valueOf(userIdStr));
+        User user = userManagementService.findById(Long.valueOf(userIdStr));
         user.reactivate();   // 상태를 ACTIVE로, 이메일 원복
 
         redisService.delete(RedisKey.REACTIVE.getPrefix() + reactiveToken);
@@ -255,142 +211,11 @@ public class UserServiceImpl implements UserService {
     public void passwordResetConfirm(String token, String newPassword) {
         String email = emailService.emailTokenVerify(token);
 
-        User user = findByEmail(email);
+        User user = userManagementService.findByEmail(email);
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         userCredentialService.updatePassword(now, user, newPassword);
         user.setUpdatedAt(now);
-    }
-
-    @Override
-    public void updateUserName(Long userId, String newUserName) {
-        User user = findActiveUser(userId);
-
-        user.setUserName(newUserName);
-        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-    }
-
-    @Override
-    public void updatePhoneNumber(Long userId, String phoneNumber) {
-        User user = findActiveUser(userId);
-        String normalized = PhoneNumberUtil.normalize(phoneNumber);
-
-        if (normalized != null
-                && !normalized.equals(user.getPhoneNumber())
-                && userRepository.existsByPhoneNumber(normalized)) {
-            throw new DuplicatePhoneNumberException("이미 사용 중인 전화번호입니다.");
-        }
-
-        user.setPhoneNumber(normalized);
-        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-    }
-
-    // 전화번호 찾기시 인증이 방법시 생각해보기
-    @Override
-    public String findMaskedEmail(String userName, String phoneNumber) {
-        String normalized = PhoneNumberUtil.normalize(phoneNumber);
-
-        User user = userRepository.findByUserNameAndPhoneNumber(userName, normalized)
-                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
-
-        String email = user.getEmail();
-
-        int atIndex = email.indexOf('@');
-        String local = email.substring(0, atIndex);
-        String domain = email.substring(atIndex);
-
-        int visibleLength = Math.min(2, local.length() - 1);   // 최소 1글자는 가려지도록
-        visibleLength = Math.max(visibleLength, 1);            // 1글자짜리도 앞 1글자는 노출
-
-        // 2글자만 노출 그외 전부 마스킹
-        String visible = local.substring(0, visibleLength);
-        String masked = "*".repeat(local.length() - visibleLength);
-
-        return visible + masked + domain;
-    }
-
-    @Override
-    public void activate(Long userId) {
-        User user = findById(userId);
-
-        if (user.getStatus() == Status.WITHDRAW) {
-            throw new InvalidUserStatusException("이미 탈퇴한 계정입니다.");
-        }
-
-        user.setStatus(Status.ACTIVE);
-        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-    }
-
-    //탈톼시 비밀번호 확인
-    @Override
-    public void withdraw(Long userId, String accessToken) {
-        User user = findById(userId);
-
-        if (user.getStatus() == Status.WITHDRAW) {
-            throw new InvalidUserStatusException("이미 탈퇴한 계정입니다.");
-        }
-
-        ManagerGroupExistsResponse response;
-        try {
-            response = coreClient.existsManagerGroup(userId);
-        } catch (Exception e) {
-            log.warn("Core 서비스 호출 실패로 탈퇴를 차단합니다 - userId: {}, 원인: {}", userId, e.getMessage());
-            throw new CoreServiceUnavailableException(
-                    "일시적으로 그룹 정보를 확인할 수 없어 탈퇴가 제한됩니다. 잠시 후 다시 시도해주세요.");
-        }
-
-        if (response.exists()) {
-            throw new ManagerGroupExistsException("그룹 관리자 역할이 있어 탈퇴할 수 없습니다.");
-        }
-
-        user.withdraw();
-        redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
-        tokenBlacklistService.blacklistToken(accessToken);
-    }
-
-    @Override
-    public void sleep(Long userId) {
-        User user = findById(userId);
-
-        if (user.getStatus() == Status.SLEEP) {
-            throw new InvalidUserStatusException("이미 휴면 상태 계정입니다.");
-        }
-
-        user.setStatus(Status.SLEEP);
-        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-
-        // 차단 시 리프레시 삭제 — 재발급 차단
-        redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
-    }
-
-    @Override
-    public void block(Long userId) {
-        User user = findById(userId);
-
-        if (user.getStatus() == Status.BLOCK) {
-            throw new InvalidUserStatusException("이미 정지된 계정입니다.");
-        }
-
-
-        user.setStatus(Status.BLOCK);
-        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-
-        // 차단 시 리프레시 삭제 — 재발급 차단
-        redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
-    }
-
-    @Override
-    public void deleteUser(Long userId) {
-        User user = findById(userId);
-
-        // Role 삭제
-        userRoleService.deleteUserRole(user);
-        // 비밀번호 삭제
-        userCredentialService.delete(user);
-        // oauth 삭제
-        oauthService.deleteAllByUser(user);
-        // 유저 삭제
-        userRepository.delete(user);
     }
 
     @Override
@@ -442,7 +267,7 @@ public class UserServiceImpl implements UserService {
             throw new InvalidRefreshTokenException("유효하지 않은 토큰입니다.");
         }
 
-        User user = findById(userId);
+        User user = userManagementService.findById(userId);
         if (!user.getStatus().isLoginable()) {
             throw new InvalidUserException(user.getStatus().getMessage());
         }
@@ -454,28 +279,6 @@ public class UserServiceImpl implements UserService {
         String accessToken = jwtProvider.createAccessToken(userId, roles);
 
         return new TokenRefreshResponse(accessToken);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<User> findExpiredWithdrawnUsers() {
-        return userRepository.findByStatusAndWithdrawnAtBefore(
-                Status.WITHDRAW, OffsetDateTime.now(ZoneOffset.UTC).minusDays(90));
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<User> findInactiveUsers() {
-        return userRepository.findByStatusAndLastLoginAtBefore(
-                Status.ACTIVE, OffsetDateTime.now(ZoneOffset.UTC).minusDays(30));
-    }
-
-    private User findActiveUser(Long userId) {
-        User user = findById(userId);
-        if (user.getStatus() != Status.ACTIVE) {
-            throw new InvalidUserStatusException("정상 상태의 계정이 아닙니다.");
-        }
-        return user;
     }
 
     private void increaseFailCount(String email) {

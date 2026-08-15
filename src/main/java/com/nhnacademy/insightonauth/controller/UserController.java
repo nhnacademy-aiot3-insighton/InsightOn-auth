@@ -3,6 +3,7 @@ package com.nhnacademy.insightonauth.controller;
 import com.nhnacademy.insightonauth.dto.auth.*;
 import com.nhnacademy.insightonauth.dto.oauth.OauthLoginRequest;
 import com.nhnacademy.insightonauth.entity.Role;
+import com.nhnacademy.insightonauth.service.UserManagementService;
 import com.nhnacademy.insightonauth.service.UserService;
 import com.nhnacademy.insightonauth.service.TokenBlacklistService;
 import jakarta.validation.Valid;
@@ -24,6 +25,7 @@ public class UserController {
     private static final String X_USER_ID = "X-User-Id";
 
     private final UserService userService;
+    private final UserManagementService userManagementService;
     private final TokenBlacklistService tokenBlacklistService;
 
     @PostMapping("/email/verify-request")
@@ -44,7 +46,7 @@ public class UserController {
     @PostMapping("/check-email")
     public ResponseEntity<EmailAvailableResponse> checkEmailAvailable(
             @RequestBody @Valid EmailAvailableRequest emailAvailableRequest) {
-        boolean available = userService.checkEmailAvailable(emailAvailableRequest.email());
+        boolean available = userManagementService.checkEmailAvailable(emailAvailableRequest.email());
 
         return ResponseEntity.ok(new EmailAvailableResponse(available));
     }
@@ -53,7 +55,7 @@ public class UserController {
     public ResponseEntity<UserSignupResponse> doSignup(
             @RequestBody @Valid UserSignupRequest userSignupRequest) {
         UserSignupResponse userSignupResponse =
-                userService.createUser(userSignupRequest.email(),
+                userManagementService.createUser(userSignupRequest.email(),
                         userSignupRequest.password(),
                         userSignupRequest.userName(),
                         userSignupRequest.phoneNumber(),
@@ -117,7 +119,7 @@ public class UserController {
 
     @PostMapping("/find-email")
     public ResponseEntity<String> findEmail(@RequestBody @Valid FindEmailRequest findEmailRequest) {
-        String email = userService.findMaskedEmail(findEmailRequest.userName(), findEmailRequest.phoneNumber());
+        String email = userManagementService.findMaskedEmail(findEmailRequest.userName(), findEmailRequest.phoneNumber());
 
         return ResponseEntity.ok(email);
     }

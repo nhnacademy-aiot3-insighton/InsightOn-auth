@@ -26,24 +26,24 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class MyPageServiceImpl implements MyPageService {
 
-    private final UserService userService;
     private final UserCredentialService userCredentialService;
     private final UserRoleService userRoleService;
     private final OauthService oauthService;
     private final OauthClientResolver oauthClientResolver;
     private final PasswordEncoder passwordEncoder;
+    private final UserManagementService userManagementService;
 
     @Override
     @Transactional(readOnly = true)
     public MyInfoResponse findMyInfo(Long userId) {
-        User user = userService.findById(userId);
+        User user = userManagementService.findById(userId);
 
         return new MyInfoResponse(user.getEmail(), user.getUserName(), user.getPhoneNumber(), user.getCreatedAt());
     }
 
     @Override
     public void updatePassword(Long userId, String currentPassword, String newPassword) {
-        User user = userService.findById(userId);
+        User user = userManagementService.findById(userId);
         UserCredential userCredential = userCredentialService.findByUser(user);
 
         // 공부해오기
@@ -57,7 +57,7 @@ public class MyPageServiceImpl implements MyPageService {
     @Override
     @Transactional(readOnly = true)
     public List<RoleResponse> findMyRoles(Long userId) {
-        User user = userService.findById(userId);
+        User user = userManagementService.findById(userId);
 
         return userRoleService.findByUser(user).stream()
                 .map(userRole -> new RoleResponse(userRole.getRole()))
@@ -67,7 +67,7 @@ public class MyPageServiceImpl implements MyPageService {
     @Override
     @Transactional(readOnly = true)
     public List<OauthResponse> findMyOauths(Long userId) {
-        User user = userService.findById(userId);
+        User user = userManagementService.findById(userId);
 
         return oauthService.findAllByUser(user).stream()
                 .map(userOauth -> new OauthResponse(userOauth.getOauthId(), userOauth.getProvider()))
@@ -76,7 +76,7 @@ public class MyPageServiceImpl implements MyPageService {
 
     @Override
     public void linkOauth(Long userId, String provider, String code) {
-        User primaryUser = userService.findById(userId);
+        User primaryUser = userManagementService.findById(userId);
         OauthClient oauthClient = oauthClientResolver.resolve(provider);
         OauthUserInfo userInfo = oauthClient.getUserInfo(code);
 
@@ -106,7 +106,7 @@ public class MyPageServiceImpl implements MyPageService {
             throw new InvalidMergeRequestException("자기 자신과는 병합할 수 없습니다.");
         }
 
-        User primaryUser = userService.findById(primaryUserId);
+        User primaryUser = userManagementService.findById(primaryUserId);
 
         // 2차 확인 - secondaryUser가 정말 이 provider/providerUserId를 갖고 있는지 검증
         Oauth secondaryOauth = oauthService.findByProviderAndProviderUserId(provider, providerUserId)
@@ -120,6 +120,6 @@ public class MyPageServiceImpl implements MyPageService {
         secondaryOauth.reassignUser(primaryUser);
 
         // secondaryUser(연동 전에 사용하던 계정 삭제) 삭제
-        userService.deleteUser(secondaryUserId);
+        userManagementService.deleteUser(secondaryUserId);
     }
 }

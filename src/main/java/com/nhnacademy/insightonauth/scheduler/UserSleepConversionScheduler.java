@@ -2,6 +2,7 @@ package com.nhnacademy.insightonauth.scheduler;
 
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.redis.RedisKey;
+import com.nhnacademy.insightonauth.service.UserManagementService;
 import com.nhnacademy.insightonauth.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,8 +19,8 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class UserSleepConversionScheduler {
 
-    private final UserService userService;
     private final RedissonClient redissonClient;
+    private final UserManagementService userManagementService;
 
     @Scheduled(cron = "0 0 2 * * *")   // 매일 새벽 2시
     public void convertInactiveUsersToSleep() {
@@ -46,11 +47,11 @@ public class UserSleepConversionScheduler {
         }
 
         try {
-            List<User> targets = userService.findInactiveUsers();
+            List<User> targets = userManagementService.findInactiveUsers();
 
             for (User user : targets) {
                 try {
-                    userService.sleep(user.getUserId());
+                    userManagementService.sleep(user.getUserId());
                 } catch (Exception e) {
                     // 하나가 실패해도 나머지는 진행되게
                     log.warn("휴면 전환 실패 - userId: {}, error: {}", user.getUserId(), e.getMessage());
