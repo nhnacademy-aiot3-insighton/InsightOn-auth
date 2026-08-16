@@ -142,6 +142,9 @@ public class UserManagementServiceImpl implements UserManagementService {
             throw new InvalidUserStatusException("이미 정지된 계정입니다.");
         }
 
+        if (user.getStatus() == Status.WITHDRAW) {
+            throw new InvalidUserStatusException("탈퇴한 계정은 정지할 수 없습니다.");
+        }
 
         user.setStatus(Status.BLOCK);
         user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
@@ -196,13 +199,16 @@ public class UserManagementServiceImpl implements UserManagementService {
                 .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
 
         String email = user.getEmail();
+        if (!email.contains("@")) {
+            throw new InvalidEmailFormatException("올바르지 않은 이메일 형식입니다.");
+        }
 
         int atIndex = email.indexOf('@');
         String local = email.substring(0, atIndex);
         String domain = email.substring(atIndex);
 
-        int visibleLength = Math.min(2, local.length() - 1);   // 최소 1글자는 가려지도록
-        visibleLength = Math.max(visibleLength, 1);            // 1글자짜리도 앞 1글자는 노출
+        // 이메일이 1글자면 전체 마스킹
+        int visibleLength = local.length() == 1 ? 0 : Math.min(2, local.length() - 1);
 
         // 2글자만 노출 그외 전부 마스킹
         String visible = local.substring(0, visibleLength);

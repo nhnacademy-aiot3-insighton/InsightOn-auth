@@ -29,6 +29,10 @@ public class RedisService {
         return Boolean.TRUE.equals(redisTemplate.hasKey(key));
     }
 
+    public String getAndDelete(String key) {
+        return redisTemplate.opsForValue().getAndDelete(key);   // GETDEL, 원자적
+    }
+
     public boolean setIfAbsent(String key, String value, Duration ttl) {
         // 혹시 null이면 NPE가 날 수 있어서 boolean 비교해서 null의 경우 false가 되게
         return Boolean.TRUE.equals(

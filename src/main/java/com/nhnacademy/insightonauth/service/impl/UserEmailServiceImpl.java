@@ -48,22 +48,23 @@ public class UserEmailServiceImpl implements UserEmailService {
         );
 
         if (!acquired) {
-            throw new VerificationResendTooSoonException(
-                    "잠시 후 다시 시도해 주세요."
-            );
+            throw new VerificationResendTooSoonException("잠시 후 다시 시도해 주세요.");
+        }
+        // 3. 카운터 증가
+        // emailVerifyRequest 안에서
+        boolean lockedNow = resendCounter.increase(
+                        RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email,
+                        RedisKey.VERIFY_RESEND_LOCK.getPrefix() + email,
+                        5,
+                            Duration.ofMinutes(15)
+                            );
+        if (lockedNow) {
+            throw new VerificationResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
         }
 
-        // 3. 발송
+        // 4. 발송
         emailService.sendVerificationCode(email);
 
-        // 4. 카운터 증가
-        // emailVerifyRequest 안에서
-        resendCounter.increase(
-                RedisKey.VERIFY_RESEND_COUNT.getPrefix() + email,
-                RedisKey.VERIFY_RESEND_LOCK.getPrefix() + email,
-                5,
-                Duration.ofMinutes(15)
-        );
     }
 
     @Override
@@ -88,15 +89,14 @@ public class UserEmailServiceImpl implements UserEmailService {
 
     @Override
     public UserLoginResponse reactive(String reactiveToken) {
-        String userIdStr = redisService.get(RedisKey.REACTIVE.getPrefix() + reactiveToken);
+        // 바로 읽어서 있으면 삭제
+        String userIdStr = redisService.getAndDelete(RedisKey.REACTIVE.getPrefix() + reactiveToken);
         if (userIdStr == null) {
             throw new InvalidReactiveTokenException("복구 요청이 유효하지 않거나 만료되었습니다.");
         }
 
         User user = userManagementService.findById(Long.valueOf(userIdStr));
         user.reactivate();   // 상태를 ACTIVE로, 이메일 원복
-
-        redisService.delete(RedisKey.REACTIVE.getPrefix() + reactiveToken);
 
         return tokenService.issueTokens(user, user.getEmail());
     }

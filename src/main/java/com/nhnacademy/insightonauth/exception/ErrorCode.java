@@ -40,7 +40,9 @@ public enum ErrorCode {
     // 비밀번호 재설정 메일 재전송 — 횟수 초과 잠금
     PASSWORD_RESET_RESEND_LOCKED(HttpStatus.LOCKED),
 
-    REDIS_OPERATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE);
+    REDIS_OPERATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE),
+
+    INVALID_EMAIL_FORMAT(HttpStatus.BAD_REQUEST);
 
     private final HttpStatus status;
 

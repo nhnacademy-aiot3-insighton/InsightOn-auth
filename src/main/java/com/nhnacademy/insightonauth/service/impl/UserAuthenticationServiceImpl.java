@@ -10,6 +10,7 @@ import com.nhnacademy.insightonauth.exception.*;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
+import com.nhnacademy.insightonauth.redis.ResendCounter;
 import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.*;
 import io.jsonwebtoken.JwtException;
@@ -42,6 +43,7 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
     private final TokenBlacklistService tokenBlacklistService;
     private final TokenService tokenService;
     private final UserManagementService userManagementService;
+    private final ResendCounter resendCounter;
 
     @Override
     public UserLoginResponse login(String email, String password) {
@@ -159,16 +161,15 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
     }
 
     private void increaseFailCount(String email) {
-        String savedFailCount = redisService.get(RedisKey.LOGIN_FAIL.getPrefix() + email);
-        int failCount = savedFailCount == null || savedFailCount.isBlank() ? 0 : Integer.parseInt(savedFailCount);
-        failCount++;
+        boolean lockedNow = resendCounter.increase(
+                RedisKey.LOGIN_FAIL.getPrefix() + email,
+                RedisKey.LOGIN_LOCK.getPrefix() + email,
+                5,
+                Duration.ofMinutes(5)
+        );
 
-        if (failCount >= 5) {
-            redisService.delete(RedisKey.LOGIN_FAIL.getPrefix() + email);
-            redisService.set(RedisKey.LOGIN_LOCK.getPrefix() + email, String.valueOf(failCount), Duration.ofMinutes(5));
+        if (lockedNow) {
             throw new LoginTemporarilyLockedException("5회 연속 로그인 실패로 5분간 잠겼습니다.");
-        } else {
-            redisService.set(RedisKey.LOGIN_FAIL.getPrefix() + email, String.valueOf(failCount), Duration.ofMinutes(5));
         }
     }
 }
