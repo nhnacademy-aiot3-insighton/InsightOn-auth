@@ -3,6 +3,7 @@ package com.nhnacademy.insightonauth.controller;
 import com.nhnacademy.insightonauth.dto.auth.*;
 import com.nhnacademy.insightonauth.dto.oauth.OauthLoginRequest;
 import com.nhnacademy.insightonauth.entity.Role;
+import com.nhnacademy.insightonauth.service.UserEmailService;
 import com.nhnacademy.insightonauth.service.UserManagementService;
 import com.nhnacademy.insightonauth.service.UserService;
 import com.nhnacademy.insightonauth.service.TokenBlacklistService;
@@ -25,12 +26,13 @@ public class UserController {
     private static final String X_USER_ID = "X-User-Id";
 
     private final UserService userService;
+    private final UserEmailService userEmailService;
     private final UserManagementService userManagementService;
     private final TokenBlacklistService tokenBlacklistService;
 
     @PostMapping("/email/verify-request")
     public ResponseEntity<Void> sendEmailVerify(@RequestBody @Valid EmailVerifyRequest emailVerifyRequest) {
-        userService.emailVerifyRequest(emailVerifyRequest.email());
+        userEmailService.emailVerifyRequest(emailVerifyRequest.email());
         return ResponseEntity.noContent().build();
     }
 
@@ -38,7 +40,7 @@ public class UserController {
     public ResponseEntity<EmailVerifyConfirmResponse> emailCodeConfirm(
             @RequestBody @Valid EmailVerifyConfirmRequest emailVerifyConfirmRequest) {
         String verificationToken =
-                userService.emailVerifyConfirm(emailVerifyConfirmRequest.email(), emailVerifyConfirmRequest.code());
+                userEmailService.emailVerifyConfirm(emailVerifyConfirmRequest.email(), emailVerifyConfirmRequest.code());
 
         return ResponseEntity.ok(new EmailVerifyConfirmResponse(verificationToken));
     }
@@ -98,13 +100,13 @@ public class UserController {
     public ResponseEntity<UserLoginResponse> userReactive(
             @RequestBody @Valid ReactiveRequest request) {
 
-        UserLoginResponse response = userService.reactive(request.reactiveToken());
+        UserLoginResponse response = userEmailService.reactive(request.reactiveToken());
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/reactivate/email-verify-request")
     public ResponseEntity<Void> userReactivateRequest(@RequestBody @Valid EmailVerifyRequest emailVerifyRequest) {
-        userService.reactivateRequest(emailVerifyRequest.email());
+        userEmailService.reactivateRequest(emailVerifyRequest.email());
         return ResponseEntity.noContent().build();
     }
 
@@ -112,7 +114,7 @@ public class UserController {
     public ResponseEntity<UserLoginResponse> userReactiveConfirm(
             @RequestBody @Valid EmailVerifyConfirmRequest emailVerifyConfirmRequest) {
         UserLoginResponse userLoginResponse =
-                userService.reactivateConfirm(emailVerifyConfirmRequest.email(), emailVerifyConfirmRequest.code());
+                userEmailService.reactivateConfirm(emailVerifyConfirmRequest.email(), emailVerifyConfirmRequest.code());
 
         return ResponseEntity.ok(userLoginResponse);
     }
@@ -126,14 +128,14 @@ public class UserController {
 
     @PostMapping("/password/reset-request")
     public ResponseEntity<Void> passwordReset(@RequestBody @Valid PasswordResetRequest passwordResetRequest) {
-        userService.passwordResetRequest(passwordResetRequest.email());
+        userEmailService.passwordResetRequest(passwordResetRequest.email());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/password/reset-confirm")
     public ResponseEntity<Void> passwordResetConfirm(
             @RequestBody @Valid PasswordResetConfirmRequest passwordResetConfirmRequest) {
-        userService.passwordResetConfirm(passwordResetConfirmRequest.token(), passwordResetConfirmRequest.password());
+        userEmailService.passwordResetConfirm(passwordResetConfirmRequest.token(), passwordResetConfirmRequest.password());
 
         return ResponseEntity.ok().build();
     }

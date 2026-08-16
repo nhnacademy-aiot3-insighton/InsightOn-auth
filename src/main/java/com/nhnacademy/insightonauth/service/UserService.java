@@ -10,25 +10,11 @@ import java.util.List;
 
 public interface UserService {
 
-    void emailVerifyRequest(String email);
-
-    String emailVerifyConfirm(String email, String code);
-
     UserLoginResponse login(String email, String password);
 
     void logout(Long userId, String accessToken);
 
     void forceLogout(Long userId);
-
-    void reactivateRequest(String email);
-
-    UserLoginResponse reactivateConfirm(String email, String code);
-
-    UserLoginResponse reactive(String restoreToken);
-
-    void passwordResetRequest(String email);
-
-    void passwordResetConfirm(String token, String newPassword);
 
     UserLoginResponse oauthLogin(String provider, String code);
 
