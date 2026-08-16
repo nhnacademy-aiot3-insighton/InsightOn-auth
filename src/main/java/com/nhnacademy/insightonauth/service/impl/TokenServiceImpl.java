@@ -42,7 +42,11 @@ public class TokenServiceImpl implements TokenService {
 
     @Override
     public boolean isWithinRestorePeriod(User user) {
-        OffsetDateTime deadline = user.getWithdrawnAt().plusDays(7);
+        OffsetDateTime withdrawnAt = user.getWithdrawnAt();
+        if (withdrawnAt == null) {
+            return false;   // 탈퇴 시각이 없으면 복구 불가로 처리 (안전한 기본값)
+        }
+        OffsetDateTime deadline = withdrawnAt.plusDays(7);
         return OffsetDateTime.now(ZoneOffset.UTC).isBefore(deadline);
     }
 
