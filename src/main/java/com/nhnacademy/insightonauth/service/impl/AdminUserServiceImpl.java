@@ -6,20 +6,17 @@ import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserRole;
-import com.nhnacademy.insightonauth.redis.RedisKey;
-import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.AdminUserService;
+import com.nhnacademy.insightonauth.service.UserManagementService;
 import com.nhnacademy.insightonauth.service.UserRoleService;
-import com.nhnacademy.insightonauth.service.UserService;
+import com.nhnacademy.insightonauth.service.UserAuthenticationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 
 @Service
@@ -28,9 +25,9 @@ import java.util.List;
 public class AdminUserServiceImpl implements AdminUserService {
 
     private final UserRepository userRepository;
-    private final UserService userService;
+    private final UserAuthenticationService userAuthenticationService;
     private final UserRoleService userRoleService;
-    private final RedisService redisService;
+    private final UserManagementService userManagementService;
 
     @Override
     @Transactional(readOnly = true)
@@ -57,7 +54,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Override
     @Transactional(readOnly = true)
     public AdminUserDetailResponse findUserDetail(Long userId) {
-        User user = userService.findById(userId);
+        User user = userManagementService.findById(userId);
         List<UserRole> userRoleList = userRoleService.findByUser(user);
 
         List<Role> roles = userRoleList.stream()
@@ -70,35 +67,35 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public void block(Long userId) {
-        userService.block(userId);
+        userManagementService.block(userId);
     }
 
     @Override
     public void sleep(Long userId) {
-        userService.sleep(userId);
+        userManagementService.sleep(userId);
     }
 
     @Override
     public void activate(Long userId) {
-        userService.activate(userId);
+        userManagementService.activate(userId);
     }
 
 
     @Override
     public void addUserRole(Long userId, Role role) {
-        User user = userService.findById(userId);
+        User user = userManagementService.findById(userId);
         userRoleService.addRole(user, role);
     }
 
     @Override
     public void removeUserRole(Long userId, Role role) {
-        User user = userService.findById(userId);
+        User user = userManagementService.findById(userId);
         userRoleService.removeRole(user, role);
     }
 
     @Override
     public void forceLogout(Long userId) {
-        userService.forceLogout(userId);
+        userAuthenticationService.forceLogout(userId);
     }
 
 }

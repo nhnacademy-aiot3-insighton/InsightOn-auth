@@ -2,7 +2,7 @@ package com.nhnacademy.insightonauth.scheduler;
 
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.redis.RedisKey;
-import com.nhnacademy.insightonauth.service.UserService;
+import com.nhnacademy.insightonauth.service.UserManagementService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -18,8 +18,8 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class UserHardDeleteScheduler {
 
-    private final UserService userService;
     private final RedissonClient redissonClient;
+    private final UserManagementService userManagementService;
 
     @Scheduled(cron = "0 0 1 * * *")   // 매일 새벽 1시
     public void hardDeleteExpiredUsers() {
@@ -42,11 +42,11 @@ public class UserHardDeleteScheduler {
         }
 
         try {
-            List<User> targets = userService.findExpiredWithdrawnUsers();
+            List<User> targets = userManagementService.findExpiredWithdrawnUsers();
 
             for (User user : targets) {
                 try {
-                    userService.deleteUser(user.getUserId());
+                    userManagementService.deleteUser(user.getUserId());
                 } catch (Exception e) {
                     log.warn("탈퇴 계정 삭제 실패 - userId: {}, error: {}", user.getUserId(), e.getMessage());
                 }
