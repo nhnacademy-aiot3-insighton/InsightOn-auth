@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.filter;
 
 import com.nhnacademy.insightonauth.service.UserRoleService;
-import com.nhnacademy.insightonauth.service.UserService;
+import com.nhnacademy.insightonauth.service.UserAuthenticationService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,7 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 
-    private final UserService userService;
+    private final UserAuthenticationService userAuthenticationService;
     private final UserRoleService userRoleService;
 
     @Override

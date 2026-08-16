@@ -10,7 +10,6 @@ import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.service.MyPageService;
 import com.nhnacademy.insightonauth.service.OauthService;
 import com.nhnacademy.insightonauth.service.UserManagementService;
-import com.nhnacademy.insightonauth.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

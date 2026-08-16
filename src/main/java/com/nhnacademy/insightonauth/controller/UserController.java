@@ -5,7 +5,7 @@ import com.nhnacademy.insightonauth.dto.oauth.OauthLoginRequest;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.service.UserEmailService;
 import com.nhnacademy.insightonauth.service.UserManagementService;
-import com.nhnacademy.insightonauth.service.UserService;
+import com.nhnacademy.insightonauth.service.UserAuthenticationService;
 import com.nhnacademy.insightonauth.service.TokenBlacklistService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -25,7 +25,7 @@ public class UserController {
 
     private static final String X_USER_ID = "X-User-Id";
 
-    private final UserService userService;
+    private final UserAuthenticationService userAuthenticationService;
     private final UserEmailService userEmailService;
     private final UserManagementService userManagementService;
     private final TokenBlacklistService tokenBlacklistService;
@@ -70,7 +70,7 @@ public class UserController {
     @PostMapping("/login")
     public ResponseEntity<String> doLogin(
             @RequestBody @Valid UserLoginRequest userLoginRequest) {
-        UserLoginResponse userLoginResponse = userService.login(userLoginRequest.email(), userLoginRequest.password());
+        UserLoginResponse userLoginResponse = userAuthenticationService.login(userLoginRequest.email(), userLoginRequest.password());
 
         // 도커용
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", userLoginResponse.refreshToken())
@@ -92,7 +92,7 @@ public class UserController {
             @RequestHeader(name = X_USER_ID) @Valid Long userId,
             @RequestHeader("Authorization") String token) {
         String accessToken = token.replace("Bearer ", "");
-        userService.logout(userId, accessToken);
+        userAuthenticationService.logout(userId, accessToken);
         return ResponseEntity.noContent().build();
     }
 
@@ -145,7 +145,7 @@ public class UserController {
             @PathVariable String provider,
             @RequestBody @Valid OauthLoginRequest request) {
 
-        UserLoginResponse response = userService.oauthLogin(provider, request.code());
+        UserLoginResponse response = userAuthenticationService.oauthLogin(provider, request.code());
         return ResponseEntity.ok(response);
     }
 
@@ -153,7 +153,7 @@ public class UserController {
     public ResponseEntity<TokenRefreshResponse> refresh(
             @RequestHeader(name = X_USER_ID) @Valid Long userId,
             @CookieValue("refreshToken") String refreshToken) {
-        TokenRefreshResponse tokenRefreshResponse = userService.refresh(userId, refreshToken);
+        TokenRefreshResponse tokenRefreshResponse = userAuthenticationService.refresh(userId, refreshToken);
 
         return ResponseEntity.ok(tokenRefreshResponse);
     }

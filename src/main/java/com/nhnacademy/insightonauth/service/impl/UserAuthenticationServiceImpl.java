@@ -5,13 +5,11 @@ import com.nhnacademy.insightonauth.client.OauthClientResolver;
 import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
-import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.*;
 import com.nhnacademy.insightonauth.exception.*;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
-import com.nhnacademy.insightonauth.redis.ResendCounter;
 import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.*;
 import io.jsonwebtoken.JwtException;
@@ -29,7 +27,7 @@ import java.util.Optional;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class UserServiceImpl implements UserService {
+public class UserAuthenticationServiceImpl implements UserAuthenticationService {
 
     // Transactional 전파 필요없으면 빼기 어노테이션 붙이기
     // private 메소드의 Transactional의 붙는 경우 proxy가 적용안되나 현재 private은 사용이 불필요

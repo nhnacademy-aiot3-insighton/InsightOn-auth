@@ -3,7 +3,6 @@ package com.nhnacademy.insightonauth.scheduler;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.service.UserManagementService;
-import com.nhnacademy.insightonauth.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;

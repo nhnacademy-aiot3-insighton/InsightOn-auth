@@ -6,21 +6,17 @@ import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserRole;
-import com.nhnacademy.insightonauth.redis.RedisKey;
-import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.AdminUserService;
 import com.nhnacademy.insightonauth.service.UserManagementService;
 import com.nhnacademy.insightonauth.service.UserRoleService;
-import com.nhnacademy.insightonauth.service.UserService;
+import com.nhnacademy.insightonauth.service.UserAuthenticationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 
 @Service
@@ -29,7 +25,7 @@ import java.util.List;
 public class AdminUserServiceImpl implements AdminUserService {
 
     private final UserRepository userRepository;
-    private final UserService userService;
+    private final UserAuthenticationService userAuthenticationService;
     private final UserRoleService userRoleService;
     private final UserManagementService userManagementService;
 
@@ -99,7 +95,7 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public void forceLogout(Long userId) {
-        userService.forceLogout(userId);
+        userAuthenticationService.forceLogout(userId);
     }
 
 }
