@@ -9,5 +9,5 @@ import org.springframework.web.bind.annotation.PathVariable;
 public interface CoreClient {
 
     @GetMapping("/internal/v1/users/{userId}/manager-group")
-    ManagerGroupResponse existsManagerGroup(@PathVariable Long userId);
+    ManagerGroupResponse getManagerGroup(@PathVariable Long userId);
 }

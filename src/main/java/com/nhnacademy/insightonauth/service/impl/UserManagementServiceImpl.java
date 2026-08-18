@@ -99,7 +99,7 @@ public class UserManagementServiceImpl implements UserManagementService {
 
         ManagerGroupResponse response;
         try {
-            response = coreClient.existsManagerGroup(userId);
+            response = coreClient.getManagerGroup(userId);
         } catch (Exception e) {
             log.warn("Core 서비스 호출 실패로 탈퇴를 차단합니다 - userId: {}, 원인: {}", userId, e.getMessage());
             throw new CoreServiceUnavailableException(
