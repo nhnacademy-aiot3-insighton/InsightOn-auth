@@ -4,7 +4,6 @@ import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserRole;
 import com.nhnacademy.insightonauth.exception.UserRoleNotFoundException;
-import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.repository.UserRoleRepository;
 import com.nhnacademy.insightonauth.service.UserRoleService;
 import lombok.RequiredArgsConstructor;

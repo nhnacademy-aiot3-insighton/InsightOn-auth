@@ -2,7 +2,7 @@ package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.client.CoreClient;
 import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
-import com.nhnacademy.insightonauth.dto.core.ManagerGroupExistsResponse;
+import com.nhnacademy.insightonauth.dto.core.ManagerGroupResponse;
 import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
@@ -97,9 +97,9 @@ public class UserManagementServiceImpl implements UserManagementService {
             throw new InvalidUserStatusException("이미 탈퇴한 계정입니다.");
         }
 
-        ManagerGroupExistsResponse response;
+        ManagerGroupResponse response;
         try {
-            response = coreClient.existsManagerGroup(userId);
+            response = coreClient.getManagerGroup(userId);
         } catch (Exception e) {
             log.warn("Core 서비스 호출 실패로 탈퇴를 차단합니다 - userId: {}, 원인: {}", userId, e.getMessage());
             throw new CoreServiceUnavailableException(
