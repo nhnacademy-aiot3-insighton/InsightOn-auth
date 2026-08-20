@@ -41,6 +41,8 @@ public class EmailService {
         // Redis에 저장 (5분 TTL)
         redisService.set(RedisKey.VERIFY.getPrefix() + email, code, Duration.ofMinutes(5));
 
+        log.info("이메일 코드 발송: {}, {}", RedisKey.VERIFY.getPrefix() + email, code);
+
         // 메일 발송
         send(email, "[InsightOn] 이메일 인증 코드",
                 "인증 코드: " + code + "\n5분 이내에 입력해 주세요.");
@@ -70,6 +72,7 @@ public class EmailService {
     }
 
     private void send(String to, String subject, String text) {
+        log.info("이메일 발송");
         try {
             MimeMessage message = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
@@ -85,6 +88,7 @@ public class EmailService {
             log.error("이메일 전송 실패(타임아웃 등) - to: {}, error: {}", to, e.getMessage());
             throw new EmailSendException("이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.", e);
         }
+        log.info("이메일 발송 성공");
     }
 
     // 이메일 코드 확인
