@@ -32,7 +32,7 @@ public class TokenServiceImpl implements TokenService {
                 .map(userRole -> userRole.getRole().name())
                 .toList();
 
-        String accessToken = jwtProvider.createAccessToken(user.getUserId(), roles);
+        String accessToken = jwtProvider.createAccessToken(user.getUserId(), roles, user.getUserName());
         String refreshToken = jwtProvider.createRefreshToken(user.getUserId(), roles);
 
         redisService.delete(RedisKey.LOGIN_LOCK.getPrefix() + email);
