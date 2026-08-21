@@ -155,7 +155,7 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
                 .map(userRole -> userRole.getRole().name())
                 .toList();
 
-        String accessToken = jwtProvider.createAccessToken(userId, roles);
+        String accessToken = jwtProvider.createAccessToken(userId, roles, user.getUserName());
 
         return new TokenRefreshResponse(accessToken);
     }
