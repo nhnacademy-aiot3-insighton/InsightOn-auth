@@ -49,7 +49,7 @@ public class JwtProvider {
         this.redisService = redisService;
     }
 
-    public String createAccessToken(Long userId, List<String> roles) {
+    public String createAccessToken(Long userId, List<String> roles, String userName) {
         Instant now = Instant.now();
         String jti = UUID.randomUUID().toString();
         return Jwts.builder()
@@ -59,6 +59,7 @@ public class JwtProvider {
                 .subject(userId.toString())
                 .id(jti) //jti
                 .claim("roles", roles)
+                .claim("name", userName)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(accessValidity)))
                 .signWith(privateKey)

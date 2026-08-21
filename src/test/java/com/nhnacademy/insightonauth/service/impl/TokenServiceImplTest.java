@@ -53,7 +53,7 @@ class TokenServiceImplTest {
     @DisplayName("역할이 하나면 토큰 발급됨")
     void issueTokens_singleRole() {
         when(userRoleService.findByUser(user)).thenReturn(List.of(new UserRole(user, Role.MEMBER)));
-        when(jwtProvider.createAccessToken(1L, List.of("MEMBER"))).thenReturn("accessToken");
+        when(jwtProvider.createAccessToken(1L, List.of("MEMBER"), "test")).thenReturn("accessToken");
         when(jwtProvider.createRefreshToken(1L, List.of("MEMBER"))).thenReturn("refreshToken");
 
         UserLoginResponse userLoginResponse = tokenService.issueTokens(user, user.getEmail());
@@ -67,7 +67,7 @@ class TokenServiceImplTest {
     void issueTokens_multiRole() {
         when(userRoleService.findByUser(user))
                 .thenReturn(List.of(new UserRole(user, Role.ADMIN), new UserRole(user, Role.MEMBER)));
-        when(jwtProvider.createAccessToken(1L, List.of("ADMIN", "MEMBER"))).thenReturn("accessToken");
+        when(jwtProvider.createAccessToken(1L, List.of("ADMIN", "MEMBER"), "test")).thenReturn("accessToken");
         when(jwtProvider.createRefreshToken(1L, List.of("ADMIN", "MEMBER"))).thenReturn("refreshToken");
 
         UserLoginResponse userLoginResponse = tokenService.issueTokens(user, user.getEmail());
