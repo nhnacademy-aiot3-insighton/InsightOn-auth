@@ -3,11 +3,14 @@ package com.nhnacademy.insightonauth.controller;
 import com.nhnacademy.insightonauth.dto.auth.*;
 import com.nhnacademy.insightonauth.dto.oauth.OauthLoginRequest;
 import com.nhnacademy.insightonauth.entity.Role;
+import com.nhnacademy.insightonauth.exception.InvalidRefreshTokenException;
+import com.nhnacademy.insightonauth.exception.RefreshTokenNotFoundException;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.service.UserEmailService;
 import com.nhnacademy.insightonauth.service.UserManagementService;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
 import com.nhnacademy.insightonauth.service.TokenBlacklistService;
+import io.jsonwebtoken.JwtException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -163,7 +166,20 @@ public class UserController {
     @PostMapping("/refresh")
     public ResponseEntity<TokenRefreshResponse> refresh(
             @CookieValue("refreshToken") String refreshToken) {
-        Long userId = Long.valueOf(jwtProvider.parse(refreshToken).getSubject());
+        // 1) refreshToken 쿠키 없음
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new RefreshTokenNotFoundException("refreshToken이 없습니다.");
+        }
+
+        // 2) 파싱(서명·만료 검증) 실패
+        Long userId;
+        try {
+            userId = Long.valueOf(jwtProvider.parse(refreshToken).getSubject());
+        } catch (JwtException | NumberFormatException e) {
+            throw new InvalidRefreshTokenException("유효하지 않은 refreshToken입니다.");
+        }
+
+        // 3) refresh 처리
         TokenRefreshResponse tokenRefreshResponse =
                 userAuthenticationService.refresh(userId, refreshToken);
         return ResponseEntity.ok(tokenRefreshResponse);
