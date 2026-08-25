@@ -3,6 +3,7 @@ package com.nhnacademy.insightonauth.controller;
 import com.nhnacademy.insightonauth.dto.auth.*;
 import com.nhnacademy.insightonauth.dto.oauth.OauthLoginRequest;
 import com.nhnacademy.insightonauth.entity.Role;
+import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.service.UserEmailService;
 import com.nhnacademy.insightonauth.service.UserManagementService;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
@@ -31,6 +32,7 @@ public class UserController {
     private final UserEmailService userEmailService;
     private final UserManagementService userManagementService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final JwtProvider jwtProvider;
 
     @PostMapping("/email/verify-request")
     public ResponseEntity<Void> sendEmailVerify(@RequestBody @Valid EmailVerifyRequest emailVerifyRequest) {
@@ -157,12 +159,13 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    // (refreshToken에서 userId 추출 — 방식은 createRefreshToken에 따라)
     @PostMapping("/refresh")
     public ResponseEntity<TokenRefreshResponse> refresh(
-            @RequestHeader(name = X_USER_ID) @Valid Long userId,
             @CookieValue("refreshToken") String refreshToken) {
-        TokenRefreshResponse tokenRefreshResponse = userAuthenticationService.refresh(userId, refreshToken);
-
+        Long userId = Long.valueOf(jwtProvider.parse(refreshToken).getSubject());
+        TokenRefreshResponse tokenRefreshResponse =
+                userAuthenticationService.refresh(userId, refreshToken);
         return ResponseEntity.ok(tokenRefreshResponse);
     }
 
