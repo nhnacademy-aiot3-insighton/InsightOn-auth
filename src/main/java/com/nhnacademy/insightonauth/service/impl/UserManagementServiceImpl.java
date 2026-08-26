@@ -1,8 +1,6 @@
 package com.nhnacademy.insightonauth.service.impl;
 
-import com.nhnacademy.insightonauth.client.CoreClient;
 import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
-import com.nhnacademy.insightonauth.dto.core.UserGroupResponse;
 import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
@@ -35,7 +33,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     private final EmailService emailService;
     private final RedisService redisService;
     private final TokenBlacklistService tokenBlacklistService;
-    private final CoreClient coreClient;
+    private final CoreService coreService;
 
     @Override
     public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken) {
@@ -99,7 +97,7 @@ public class UserManagementServiceImpl implements UserManagementService {
 
         boolean isGroupManager;
         try {
-            isGroupManager = coreClient.isGroupManager(userId);
+            isGroupManager = coreService.isGroupManager(userId);
         } catch (Exception e) {
             log.warn("Core 서비스 호출 실패로 탈퇴를 차단합니다 - userId: {}, 원인: {}", userId, e.getMessage());
             throw new CoreServiceUnavailableException(

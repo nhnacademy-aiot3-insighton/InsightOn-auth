@@ -1,6 +1,5 @@
 package com.nhnacademy.insightonauth.service.impl;
 
-import com.nhnacademy.insightonauth.client.CoreClient;
 import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.client.OauthClientResolver;
 import com.nhnacademy.insightonauth.dto.core.UserGroupResponse;
@@ -34,20 +33,23 @@ public class MyPageServiceImpl implements MyPageService {
     private final OauthClientResolver oauthClientResolver;
     private final PasswordEncoder passwordEncoder;
     private final UserManagementService userManagementService;
-    private final CoreClient coreClient;
+    private final CoreService coreService;
 
     @Override
     @Transactional(readOnly = true)
     public MyInfoResponse findMyInfo(Long userId) {
         User user = userManagementService.findById(userId);
-        UserGroupResponse userGroupResponse = coreClient.getUserGroup(userId);
+        UserGroupResponse userGroupResponse = coreService.getUserGroup(userId);
 
-        // 그룹있는데 왜 false?
+        String groupName = (userGroupResponse.exists() && userGroupResponse.groupName() != null)
+                ? userGroupResponse.groupName()
+                : "그룹 없음";
+
         return new MyInfoResponse(user.getEmail(),
                 user.getUserName(),
                 user.getPhoneNumber(),
                 user.getCreatedAt(),
-                userGroupResponse.exists() ? userGroupResponse.groupName() : "그룹 없음");
+                groupName);
     }
 
     @Override
