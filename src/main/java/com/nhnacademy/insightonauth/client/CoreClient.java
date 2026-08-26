@@ -5,7 +5,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-@FeignClient(name = "insighton-core", url = "${gateway-route.core}")
+@FeignClient(name = "insighton-core", url = "${service-url.core}")
 public interface CoreClient {
 
     // 마이페이지시 내 그룹 확인
