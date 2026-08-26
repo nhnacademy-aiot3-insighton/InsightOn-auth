@@ -2,6 +2,7 @@ package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.client.CoreClient;
 import com.nhnacademy.insightonauth.dto.core.UserGroupResponse;
+import com.nhnacademy.insightonauth.exception.CoreServiceUnavailableException;
 import com.nhnacademy.insightonauth.service.CoreService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,8 +24,12 @@ public class CoreServiceImpl implements CoreService {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public boolean isGroupManager(Long userId) {
-        Boolean result = coreClient.isGroupManager(userId);   // Boolean으로 먼저 받고
-        return Boolean.TRUE.equals(result);                    // null이면 false로 안전하게 처리
+        Boolean result = coreClient.isGroupManager(userId);
+        if (result == null) {
+            throw new CoreServiceUnavailableException(
+                    "Core 서비스로부터 그룹 관리자 여부를 확인할 수 없습니다. userId=" + userId);
+        }
+        return result;
     }
 
     @Override
