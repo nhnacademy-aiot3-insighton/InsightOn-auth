@@ -44,6 +44,7 @@ public class MypageController {
             @RequestHeader(name = X_USER_ID) @Valid Long userId,
             @RequestBody @Valid MyInfoUpdateRequest request) {
 
+        // 전화번호가 문자수가 넘음
         userManagementService.updateUserName(userId, request.name());
         userManagementService.updatePhoneNumber(userId, request.phoneNumber());
         return ResponseEntity.ok().build();

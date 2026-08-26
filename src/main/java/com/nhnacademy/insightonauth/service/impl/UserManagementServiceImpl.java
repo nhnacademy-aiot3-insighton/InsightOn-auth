@@ -1,8 +1,6 @@
 package com.nhnacademy.insightonauth.service.impl;
 
-import com.nhnacademy.insightonauth.client.CoreClient;
 import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
-import com.nhnacademy.insightonauth.dto.core.ManagerGroupResponse;
 import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
@@ -35,7 +33,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     private final EmailService emailService;
     private final RedisService redisService;
     private final TokenBlacklistService tokenBlacklistService;
-    private final CoreClient coreClient;
+    private final CoreService coreService;
 
     @Override
     public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken) {
@@ -97,16 +95,16 @@ public class UserManagementServiceImpl implements UserManagementService {
             throw new InvalidUserStatusException("이미 탈퇴한 계정입니다.");
         }
 
-        ManagerGroupResponse response;
+        boolean isGroupManager;
         try {
-            response = coreClient.getManagerGroup(userId);
+            isGroupManager = coreService.isGroupManager(userId);
         } catch (Exception e) {
             log.warn("Core 서비스 호출 실패로 탈퇴를 차단합니다 - userId: {}, 원인: {}", userId, e.getMessage());
             throw new CoreServiceUnavailableException(
                     "일시적으로 그룹 정보를 확인할 수 없어 탈퇴가 제한됩니다. 잠시 후 다시 시도해주세요.");
         }
 
-        if (response.exists()) {
+        if (isGroupManager) {
             throw new ManagerGroupExistsException("그룹 관리자 역할이 있어 탈퇴할 수 없습니다.");
         }
 
