@@ -3,7 +3,7 @@ package com.nhnacademy.insightonauth.service.impl;
 import com.nhnacademy.insightonauth.client.CoreClient;
 import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.client.OauthClientResolver;
-import com.nhnacademy.insightonauth.dto.core.ManagerGroupResponse;
+import com.nhnacademy.insightonauth.dto.core.UserGroupResponse;
 import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
 import com.nhnacademy.insightonauth.dto.mypage.RoleResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
@@ -40,14 +40,14 @@ public class MyPageServiceImpl implements MyPageService {
     @Transactional(readOnly = true)
     public MyInfoResponse findMyInfo(Long userId) {
         User user = userManagementService.findById(userId);
-        ManagerGroupResponse managerGroupResponse = coreClient.getManagerGroup(userId);
+        UserGroupResponse userGroupResponse = coreClient.getUserGroup(userId);
 
         // 그룹있는데 왜 false?
         return new MyInfoResponse(user.getEmail(),
                 user.getUserName(),
                 user.getPhoneNumber(),
                 user.getCreatedAt(),
-                managerGroupResponse.exists() ? managerGroupResponse.groupName() : "그룹 없음");
+                userGroupResponse.exists() ? userGroupResponse.groupName() : "그룹 없음");
     }
 
     @Override
