@@ -30,5 +30,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findByStatusAndWithdrawnAtBefore(Status status, OffsetDateTime withdrawnAtBefore);
 
-    List<User> findByStatusAndLastLoginAtBefore(Status status, OffsetDateTime dateTime);;
+    List<User> findByStatusAndLastLoginAtBefore(Status status, OffsetDateTime dateTime);
 }

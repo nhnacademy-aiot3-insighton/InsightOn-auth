@@ -39,7 +39,6 @@ public class UserController {
 
     @PostMapping("/email/verify-request")
     public ResponseEntity<Void> sendEmailVerify(@RequestBody @Valid EmailVerifyRequest emailVerifyRequest) {
-        log.info("이메일 코드 요청: email={}", emailVerifyRequest.email());
         userEmailService.emailVerifyRequest(emailVerifyRequest.email());
         return ResponseEntity.noContent().build();
     }
@@ -47,7 +46,6 @@ public class UserController {
     @PostMapping("/email/verify-confirm")
     public ResponseEntity<EmailVerifyConfirmResponse> emailCodeConfirm(
             @RequestBody @Valid EmailVerifyConfirmRequest emailVerifyConfirmRequest) {
-        log.info("이메일 코드 확인 요청: email={}", emailVerifyConfirmRequest.email());
         String verificationToken =
                 userEmailService.emailVerifyConfirm(emailVerifyConfirmRequest.email(), emailVerifyConfirmRequest.code());
 
@@ -57,7 +55,6 @@ public class UserController {
     @PostMapping("/check-email")
     public ResponseEntity<EmailAvailableResponse> checkEmailAvailable(
             @RequestBody @Valid EmailAvailableRequest emailAvailableRequest) {
-        log.info("이메일 중복 요청: email={}", emailAvailableRequest.email());
         boolean available = userManagementService.checkEmailAvailable(emailAvailableRequest.email());
 
         return ResponseEntity.ok(new EmailAvailableResponse(available));
@@ -66,9 +63,6 @@ public class UserController {
     @PostMapping("/signup")
     public ResponseEntity<UserSignupResponse> doSignup(
             @RequestBody @Valid UserSignupRequest userSignupRequest) {
-
-        log.info("회원가입 요청: email={}", userSignupRequest.email());
-
         UserSignupResponse userSignupResponse =
                 userManagementService.createUser(userSignupRequest.email(),
                         userSignupRequest.password(),
