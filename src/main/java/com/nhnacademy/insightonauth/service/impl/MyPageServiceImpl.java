@@ -1,7 +1,9 @@
 package com.nhnacademy.insightonauth.service.impl;
 
+import com.nhnacademy.insightonauth.client.CoreClient;
 import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.client.OauthClientResolver;
+import com.nhnacademy.insightonauth.dto.core.ManagerGroupResponse;
 import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
 import com.nhnacademy.insightonauth.dto.mypage.RoleResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
@@ -32,13 +34,20 @@ public class MyPageServiceImpl implements MyPageService {
     private final OauthClientResolver oauthClientResolver;
     private final PasswordEncoder passwordEncoder;
     private final UserManagementService userManagementService;
+    private final CoreClient coreClient;
 
     @Override
     @Transactional(readOnly = true)
     public MyInfoResponse findMyInfo(Long userId) {
         User user = userManagementService.findById(userId);
+        ManagerGroupResponse managerGroupResponse = coreClient.getManagerGroup(userId);
 
-        return new MyInfoResponse(user.getEmail(), user.getUserName(), user.getPhoneNumber(), user.getCreatedAt());
+        // 그룹있는데 왜 false?
+        return new MyInfoResponse(user.getEmail(),
+                user.getUserName(),
+                user.getPhoneNumber(),
+                user.getCreatedAt(),
+                managerGroupResponse.exists() ? managerGroupResponse.groupName() : "그룹 없음");
     }
 
     @Override
@@ -46,9 +55,13 @@ public class MyPageServiceImpl implements MyPageService {
         User user = userManagementService.findById(userId);
         UserCredential userCredential = userCredentialService.findByUser(user);
 
-        // 공부해오기
+        // 기존 비밀번호와 동일하게 변경할 수 없게 만들기
         if (!passwordEncoder.matches(currentPassword, userCredential.getPasswordHash())) {
             throw new InvalidCredentialsException("기존 비밀번호가 올바르지 않습니다.");
+        }
+        // 새 비밀번호가 기존과 같은지 확인
+        if (passwordEncoder.matches(newPassword, userCredential.getPasswordHash())) {
+            throw new SameAsOldPasswordException("새 비밀번호는 기존 비밀번호와 달라야 합니다.");
         }
 
         userCredentialService.updatePassword(OffsetDateTime.now(ZoneOffset.UTC), user, newPassword);
