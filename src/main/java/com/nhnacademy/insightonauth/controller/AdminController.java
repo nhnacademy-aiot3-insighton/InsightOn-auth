@@ -4,15 +4,25 @@ package com.nhnacademy.insightonauth.controller;
 import com.nhnacademy.insightonauth.dto.admin.AdminFindUsersResponse;
 import com.nhnacademy.insightonauth.dto.admin.AdminUserDetailResponse;
 import com.nhnacademy.insightonauth.dto.admin.RoleChangeRequest;
-import com.nhnacademy.insightonauth.dto.admin.StatusChangeRequest;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginRequest;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
 import com.nhnacademy.insightonauth.entity.Status;
+import com.nhnacademy.insightonauth.exception.InvalidCredentialsException;
+import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.service.AdminUserService;
+import com.nhnacademy.insightonauth.service.UserAuthenticationService;
+import com.nhnacademy.insightonauth.service.UserManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.Duration;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -20,6 +30,35 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
 
     private final AdminUserService adminUserService;
+    private final UserAuthenticationService userAuthenticationService;
+    private final UserManagementService userManagementService;
+    private final JwtProvider jwtProvider;
+
+    @PostMapping("/login")
+    public ResponseEntity<String> doLogin(
+            @RequestBody @Valid UserLoginRequest userLoginRequest) {
+        UserLoginResponse userLoginResponse = userAuthenticationService.login(userLoginRequest.email(), userLoginRequest.password());
+
+        // 공통 검증기 사용 — 타입 안전, roles 없음/형식오류는 안전하게 false
+        if (!jwtProvider.hasAdminRole(userLoginResponse.accessToken())) {
+            // 계정 열거 방지: 관리자 아님 / 비번 오류 / 없는 계정 모두 동일 메시지
+            throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
+        }
+
+        // 도커용
+        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", userLoginResponse.refreshToken())
+                .httpOnly(true)
+                .secure(true)           // https라 true
+                .path("/")
+                .sameSite("Lax")
+                .maxAge(Duration.ofDays(7))
+                .build();               // domain 안 박음
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())   // refresh 쿠키 헤더에 설정
+                .body(userLoginResponse.accessToken());
+
+    }
 
     // 회원 목록 조회 (검색·페이징)
     @GetMapping("/users")
