@@ -39,11 +39,10 @@ public class AdminController {
             @RequestBody @Valid UserLoginRequest userLoginRequest) {
         UserLoginResponse userLoginResponse = userAuthenticationService.login(userLoginRequest.email(), userLoginRequest.password());
 
-        @SuppressWarnings("unchecked")
-        List<String> roles =
-                (List<String>) jwtProvider.parse(userLoginResponse.accessToken()).get("roles");
-        if (roles == null || !roles.contains("ADMIN")) {
-            throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");   // → 403
+        // 공통 검증기 사용 — 타입 안전, roles 없음/형식오류는 안전하게 false
+        if (!jwtProvider.hasAdminRole(userLoginResponse.accessToken())) {
+            // 계정 열거 방지: 관리자 아님 / 비번 오류 / 없는 계정 모두 동일 메시지
+            throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 
         // 도커용

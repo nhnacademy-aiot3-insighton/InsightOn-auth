@@ -81,14 +81,11 @@ public class UserController {
             @RequestBody @Valid UserLoginRequest userLoginRequest) {
         UserLoginResponse userLoginResponse = userAuthenticationService.login(userLoginRequest.email(), userLoginRequest.password());
 
-        @SuppressWarnings("unchecked")
-        List<String> roles =
-                (List<String>) jwtProvider.parse(userLoginResponse.accessToken()).get("roles");
-        if (roles != null && roles.contains("ADMIN")) {
-            // 관리자라고 알려주지 않고, 그냥 일반 로그인 실패처럼 처리
+
+        if (jwtProvider.hasAdminRole(userLoginResponse.accessToken())) {
+            // 계정 열거 방지: 관리자 아님 / 비번 오류 / 없는 계정 모두 동일 메시지
             throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
-
         // 도커용
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", userLoginResponse.refreshToken())
                 .httpOnly(true)
