@@ -17,7 +17,7 @@ public class CoreController {
 
     private final UserManagementService userManagementService;
 
-    @GetMapping("{userId}")
+    @GetMapping("/{userId}")
     public ResponseEntity<AuthUserResponse> getUserById(@PathVariable("userId") Long userId) {
         User user = userManagementService.findById(userId);
 
