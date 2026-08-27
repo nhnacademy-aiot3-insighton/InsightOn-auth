@@ -18,10 +18,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Component
 public class JwtProvider {
@@ -138,4 +135,28 @@ public class JwtProvider {
         return KeyFactory.getInstance("RSA")
                 .generatePublic(new X509EncodedKeySpec(decoded));
     }
+
+    /**
+     * accessToken의 roles 클레임에 ADMIN이 포함되어 있는지 타입 안전하게 검사한다.
+     * roles가 없거나 형식이 예상과 다르면 false를 반환한다.
+     */
+    public boolean hasAdminRole(String accessToken) {
+        return extractRoles(accessToken).contains("ADMIN");
+    }
+
+    /**
+     * accessToken에서 roles 클레임을 문자열 리스트로 안전하게 추출한다.
+     * 클레임이 없거나 List 타입이 아니면 빈 리스트를 반환한다.
+     */
+    public List<String> extractRoles(String accessToken) {
+        Object claim = parse(accessToken).get("roles");
+        if (!(claim instanceof List<?> rawList)) {
+            return List.of();   // roles 없음 / 타입 불일치 → 빈 리스트 (ClassCastException 방지)
+        }
+        return rawList.stream()
+                .filter(Objects::nonNull)
+                .map(Object::toString)   // enum/String 무엇이든 문자열로 통일
+                .toList();
+    }
+
 }

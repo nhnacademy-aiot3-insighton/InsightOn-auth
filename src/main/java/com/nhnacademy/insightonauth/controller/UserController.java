@@ -3,6 +3,7 @@ package com.nhnacademy.insightonauth.controller;
 import com.nhnacademy.insightonauth.dto.auth.*;
 import com.nhnacademy.insightonauth.dto.oauth.OauthLoginRequest;
 import com.nhnacademy.insightonauth.entity.Role;
+import com.nhnacademy.insightonauth.exception.InvalidCredentialsException;
 import com.nhnacademy.insightonauth.exception.InvalidRefreshTokenException;
 import com.nhnacademy.insightonauth.exception.RefreshTokenNotFoundException;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
@@ -22,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
+import java.util.List;
 
 @RestController
 @Slf4j
@@ -79,6 +81,11 @@ public class UserController {
             @RequestBody @Valid UserLoginRequest userLoginRequest) {
         UserLoginResponse userLoginResponse = userAuthenticationService.login(userLoginRequest.email(), userLoginRequest.password());
 
+
+        if (jwtProvider.hasAdminRole(userLoginResponse.accessToken())) {
+            // 계정 열거 방지: 관리자 아님 / 비번 오류 / 없는 계정 모두 동일 메시지
+            throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
+        }
         // 도커용
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", userLoginResponse.refreshToken())
                 .httpOnly(true)
@@ -139,6 +146,7 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    // 비밀번호 재설시 전과 동일한비밀번호는 막게 수정
     @PostMapping("/password/reset-confirm")
     public ResponseEntity<Void> passwordResetConfirm(
             @RequestBody @Valid PasswordResetConfirmRequest passwordResetConfirmRequest) {
