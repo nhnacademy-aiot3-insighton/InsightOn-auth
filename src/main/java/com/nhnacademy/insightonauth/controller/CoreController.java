@@ -25,7 +25,7 @@ public class CoreController {
                 new AuthUserResponse(user.getUserId(), user.getUserName(), user.getPhoneNumber(), user.getStatus()));
     }
 
-    @GetMapping("/{user-email}")
+    @GetMapping("/invite/{user-email}")
     public ResponseEntity<AuthUserResponse> getUserByEmail(@PathVariable("user-email") String userEmail) {
         User user = userManagementService.findByEmail(userEmail);
 
