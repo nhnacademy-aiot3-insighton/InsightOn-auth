@@ -9,10 +9,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 public interface CoreClient {
 
     // 그룹 관리자인지 확인
-    @GetMapping("/internal/v1/users/{userId}/manager-group")
-    Boolean isGroupManager(@PathVariable Long userId);
+    @GetMapping("/internal/v1/users/{user-id}/manager-group")
+    Boolean isGroupManager(@PathVariable(name = "user-id") Long userId);
 
     // 마이페이지시 내 그룹 확인
-    @GetMapping("/internal/v1/users/{userId}/group")
-    UserGroupResponse getUserGroup(@PathVariable Long userId);
+    @GetMapping("/internal/v1/users/{user-id}/group")
+    UserGroupResponse getUserGroup(@PathVariable(name = "user-id") Long userId);
 }
