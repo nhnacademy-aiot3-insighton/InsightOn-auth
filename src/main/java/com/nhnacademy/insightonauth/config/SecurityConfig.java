@@ -45,7 +45,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/find-email",
                                 "/api/v1/auth/password/reset-request",
                                 "/api/v1/auth/password/reset-confirm",
-                                "/internal/v1/users/**",
+                                "/internal/v1/**",
                                 "/api/v1/auth/tokens/*/blacklisted",
                                 "/api/v1/admin/login").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
