@@ -24,4 +24,12 @@ public class CoreController {
         return ResponseEntity.ok(
                 new AuthUserResponse(user.getUserId(), user.getUserName(), user.getPhoneNumber(), user.getStatus()));
     }
+
+    @GetMapping("/{user-email}")
+    public ResponseEntity<AuthUserResponse> getUserByEmail(@PathVariable("user-email") String userEmail) {
+        User user = userManagementService.findByEmail(userEmail);
+
+        return ResponseEntity.ok(
+                new AuthUserResponse(user.getUserId(), user.getUserName(), user.getPhoneNumber(), user.getStatus()));
+    }
 }
