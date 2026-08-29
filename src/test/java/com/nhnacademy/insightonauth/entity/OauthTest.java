@@ -24,4 +24,15 @@ class OauthTest {
         assertThat(oauth.getProviderUserId()).isEqualTo("provider-user-id-123");
         assertThat(oauth.getCreatedAt()).isNotNull();
     }
+
+    @Test
+    @DisplayName("reassignUser 호출 시 연결된 user 변경")
+    void reassignUser_changesUser() {
+        Oauth oauth = new Oauth(user, "google", "pid-123");
+        User newUser = new User("new@test.com", "new", "01099998888");
+
+        oauth.reassignUser(newUser);
+
+        assertThat(oauth.getUser()).isEqualTo(newUser);
+    }
 }
