@@ -1,6 +1,7 @@
 package com.nhnacademy.insightonauth.entity;
 
 import com.github.f4b6a3.uuid.UuidCreator;
+import com.nhnacademy.insightonauth.util.WithdrawalMask;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -63,11 +64,11 @@ public class Oauth {
     }
 
     public boolean isMasked() {
-        return this.providerUserId.contains(";");
+        return WithdrawalMask.isMasked(this.providerUserId);
     }
 
     /** 마스킹 접미사를 뗀 원본 provider_user_id (마스킹 안 됐으면 그대로). */
     public String reactivatedProviderUserId() {
-        return this.providerUserId.split(";")[0];
+        return WithdrawalMask.strip(this.providerUserId);
     }
 }

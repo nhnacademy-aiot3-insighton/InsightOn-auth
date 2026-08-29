@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -83,7 +85,7 @@ class OauthRepositoryTest {
         oauth.maskForWithdrawal();
         oauthRepository.saveAndFlush(oauth);
 
-        List<Oauth> found = oauthRepository.findByProviderAndProviderUserIdStartingWith(
+        List<Oauth> found = oauthRepository.findByProviderAndProviderUserIdStartingWithOrderByUserWithdrawnAtDesc(
                 "google", "google-provider-id-123;");
 
         assertThat(found).hasSize(1);
@@ -93,10 +95,38 @@ class OauthRepositoryTest {
     @Test
     @DisplayName("접두어로 조회 시 다른 provider_user_id는 매칭되지 않음")
     void findByProviderAndProviderUserIdStartingWith_doesNotMatchOthers() {
-        List<Oauth> found = oauthRepository.findByProviderAndProviderUserIdStartingWith(
+        List<Oauth> found = oauthRepository.findByProviderAndProviderUserIdStartingWithOrderByUserWithdrawnAtDesc(
                 "google", "google-provider-id-123;");
 
         assertThat(found).isEmpty();
+    }
+
+    @Test
+    @DisplayName("같은 소셜 식별자로 여러 번 탈퇴 시 withdrawnAt 최신순 반환")
+    void findByProviderAndProviderUserIdStartingWith_ordersByWithdrawnAtDesc() {
+        // user1: 오래된 탈퇴
+        User old = new User("old@test.com", "old", "01011112222");
+        old.withdraw();
+        old.setWithdrawnAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(30));
+        userRepository.save(old);
+        Oauth oldOauth = new Oauth(old, "google", "shared-id");
+        oldOauth.maskForWithdrawal();
+        oauthRepository.save(oldOauth);
+
+        // user2: 최근 탈퇴
+        User recent = new User("recent@test.com", "recent", "01033334444");
+        recent.withdraw();
+        recent.setWithdrawnAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(1));
+        userRepository.save(recent);
+        Oauth recentOauth = new Oauth(recent, "google", "shared-id");
+        recentOauth.maskForWithdrawal();
+        oauthRepository.saveAndFlush(recentOauth);
+
+        List<Oauth> found = oauthRepository.findByProviderAndProviderUserIdStartingWithOrderByUserWithdrawnAtDesc(
+                "google", "shared-id;");
+
+        assertThat(found).hasSize(2);
+        assertThat(found.getFirst().getUser().getUserName()).isEqualTo("recent");
     }
 
     @Test

@@ -103,7 +103,7 @@ public class OauthServiceImpl implements OauthService {
     @Transactional(readOnly = true)
     public Optional<Oauth> findReactivatableByProviderAndProviderUserId(String provider, String providerUserId) {
         return oauthRepository
-                .findByProviderAndProviderUserIdStartingWith(provider, providerUserId + ";")
+                .findByProviderAndProviderUserIdStartingWithOrderByUserWithdrawnAtDesc(provider, providerUserId + ";")
                 .stream()
                 .filter(oauth -> oauth.getUser().getStatus() == Status.WITHDRAW)
                 .findFirst();

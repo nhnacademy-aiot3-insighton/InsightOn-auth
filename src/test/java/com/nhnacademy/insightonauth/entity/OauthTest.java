@@ -71,4 +71,23 @@ class OauthTest {
         assertThat(oauth.getProviderUserId()).isEqualTo("pid-123");
         assertThat(oauth.isMasked()).isFalse();
     }
+
+    @Test
+    @DisplayName("provider_user_id에 ';'가 포함돼도 마스킹/복원이 원본을 보존")
+    void maskAndUnmask_whenIdContainsSemicolon() {
+        Oauth oauth = new Oauth(user, "google", "pid;123;abc");
+
+        assertThat(oauth.isMasked()).isFalse();
+
+        oauth.maskForWithdrawal();
+
+        assertThat(oauth.isMasked()).isTrue();
+        assertThat(oauth.getProviderUserId()).startsWith("pid;123;abc;");
+        assertThat(oauth.reactivatedProviderUserId()).isEqualTo("pid;123;abc");
+
+        oauth.unmask();
+
+        assertThat(oauth.getProviderUserId()).isEqualTo("pid;123;abc");
+        assertThat(oauth.isMasked()).isFalse();
+    }
 }
