@@ -87,6 +87,18 @@ class UserTest {
     }
 
     @Test
+    @DisplayName("이메일에 ';'가 포함돼도 withdraw 후 reactivate가 원본 이메일 복원")
+    void withdraw_then_reactivate_whenEmailContainsSemicolon() {
+        User user = new User("a;b@test.com", "test", "01012345678");
+        user.withdraw();
+
+        user.reactivate();
+
+        assertThat(user.getEmail()).isEqualTo("a;b@test.com");
+        assertThat(user.getStatus()).isEqualTo(Status.ACTIVE);
+    }
+
+    @Test
     @DisplayName("withdraw후 reactivate시 lastLoginAt, updatedAt 갱신")
     void withdraw_then_reactivate_updatesTimeFields() {
         User user = new User("test@test.com", "test", "01012345678");

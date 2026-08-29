@@ -2,6 +2,7 @@ package com.nhnacademy.insightonauth.entity;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import com.nhnacademy.insightonauth.exception.InvalidUserStatusException;
+import com.nhnacademy.insightonauth.util.WithdrawalMask;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -82,9 +83,9 @@ public class User {
 
         // 탈퇴 상태였다면, 이메일/전화번호 복원
         if (this.status == Status.WITHDRAW) {
-            this.email = this.email.split(";")[0];
+            this.email = reactivatedEmail();
             if (this.phoneNumber != null) {
-                this.phoneNumber = this.phoneNumber.split(";")[0];
+                this.phoneNumber = reactivatedPhoneNumber();
             }
             this.withdrawnAt = null;
         }
@@ -92,6 +93,16 @@ public class User {
         this.status = Status.ACTIVE;
         this.updatedAt = now;
         this.lastLoginAt = now;
+    }
+
+    /** 마스킹 접미사를 뗀 원본 이메일 (마스킹 안 됐으면 그대로). */
+    public String reactivatedEmail() {
+        return WithdrawalMask.strip(this.email);
+    }
+
+    /** 마스킹 접미사를 뗀 원본 전화번호 (null이면 null). */
+    public String reactivatedPhoneNumber() {
+        return WithdrawalMask.strip(this.phoneNumber);
     }
 
     public void withdraw() {

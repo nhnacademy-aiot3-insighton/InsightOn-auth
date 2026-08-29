@@ -104,17 +104,38 @@ class UserRepositoryTest {
         userRepository.save(activeUser);
         String originalEmailPrefix = "test@test.com;";
 
-        Optional<User> found = userRepository.findByEmailStartingWithAndStatus(originalEmailPrefix, Status.WITHDRAW);
+        List<User> found = userRepository.findByEmailStartingWithAndStatusOrderByWithdrawnAtDesc(
+                originalEmailPrefix, Status.WITHDRAW);
 
-        assertThat(found).isPresent();
+        assertThat(found).hasSize(1);
     }
 
     @Test
     @DisplayName("email 접두어는 맞지만 status 불일치 시 빈 값 반환")
     void findByEmailStartingWithAndStatus_whenStatusMismatch_returnsEmpty() {
-        Optional<User> found = userRepository.findByEmailStartingWithAndStatus("test@test.com", Status.WITHDRAW);
+        List<User> found = userRepository.findByEmailStartingWithAndStatusOrderByWithdrawnAtDesc(
+                "test@test.com", Status.WITHDRAW);
 
         assertThat(found).isEmpty();
+    }
+
+    @Test
+    @DisplayName("동일 원본 email로 여러 번 탈퇴 시 withdrawnAt 최신순 반환")
+    void findByEmailStartingWithAndStatus_ordersByWithdrawnAtDesc() {
+        activeUser.withdraw();
+        activeUser.setWithdrawnAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(10));
+        userRepository.save(activeUser);
+
+        User second = new User("test@test.com", "test2", "01022223333");
+        second.withdraw();
+        second.setWithdrawnAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(1));
+        userRepository.save(second);
+
+        List<User> found = userRepository.findByEmailStartingWithAndStatusOrderByWithdrawnAtDesc(
+                "test@test.com;", Status.WITHDRAW);
+
+        assertThat(found).hasSize(2);
+        assertThat(found.getFirst().getUserName()).isEqualTo("test2");
     }
 
     @Test

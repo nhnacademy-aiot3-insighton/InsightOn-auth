@@ -1,9 +1,11 @@
 package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.entity.Oauth;
+import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.exception.LastLoginMethodException;
 import com.nhnacademy.insightonauth.exception.OauthNotFoundException;
+import com.nhnacademy.insightonauth.exception.ReactivationConflictException;
 import com.nhnacademy.insightonauth.repository.OauthRepository;
 import com.nhnacademy.insightonauth.service.OauthService;
 import com.nhnacademy.insightonauth.service.UserCredentialService;
@@ -72,5 +74,38 @@ public class OauthServiceImpl implements OauthService {
     @Transactional(readOnly = true)
     public Optional<Oauth> findByProviderAndProviderUserId(String provider, String providerUserId) {
         return oauthRepository.findByProviderAndProviderUserId(provider, providerUserId);
+    }
+
+    @Override
+    public void maskByUser(User user) {
+        oauthRepository.findByUser(user).forEach(Oauth::maskForWithdrawal);
+        // 같은 트랜잭션에서 곧바로 동일 식별자로 새 연동을 INSERT 하는 경우가 있어,
+        // 마스킹 UPDATE 를 먼저 반영해 유니크 충돌을 막는다.
+        oauthRepository.flush();
+    }
+
+    @Override
+    public void reactivateByUser(User user) {
+        for (Oauth oauth : oauthRepository.findByUser(user)) {
+            if (!oauth.isMasked()) {
+                continue;
+            }
+            String original = oauth.reactivatedProviderUserId();
+            if (oauthRepository.findByProviderAndProviderUserId(oauth.getProvider(), original).isPresent()) {
+                throw new ReactivationConflictException(
+                        "연동된 소셜 계정이 다른 계정에서 사용 중이라 복구할 수 없습니다.");
+            }
+            oauth.unmask();
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Oauth> findReactivatableByProviderAndProviderUserId(String provider, String providerUserId) {
+        return oauthRepository
+                .findByProviderAndProviderUserIdStartingWithOrderByUserWithdrawnAtDesc(provider, providerUserId + ";")
+                .stream()
+                .filter(oauth -> oauth.getUser().getStatus() == Status.WITHDRAW)
+                .findFirst();
     }
 }
