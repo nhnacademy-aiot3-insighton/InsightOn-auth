@@ -7,13 +7,11 @@ import com.nhnacademy.insightonauth.exception.InvalidCredentialsException;
 import com.nhnacademy.insightonauth.exception.InvalidRefreshTokenException;
 import com.nhnacademy.insightonauth.exception.RefreshTokenNotFoundException;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
+import com.nhnacademy.insightonauth.service.UserAuthenticationService;
 import com.nhnacademy.insightonauth.service.UserEmailService;
 import com.nhnacademy.insightonauth.service.UserManagementService;
-import com.nhnacademy.insightonauth.service.UserAuthenticationService;
-import com.nhnacademy.insightonauth.service.TokenBlacklistService;
 import io.jsonwebtoken.JwtException;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -23,28 +21,33 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
-import java.util.List;
 
+/**
+ * 정상 인증 흐름을 담당하는 컨트롤러.
+ * 회원가입(이메일 인증 포함), 로그인/로그아웃, 소셜 로그인, 액세스 토큰 재발급을 처리한다.
+ * 계정을 잃어버린 뒤의 복구 흐름은 {@link AccountController}가 담당한다.
+ */
 @RestController
 @Slf4j
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
-public class UserController {
+public class AuthController {
 
     private static final String X_USER_ID = "X-User-Id";
 
     private final UserAuthenticationService userAuthenticationService;
     private final UserEmailService userEmailService;
     private final UserManagementService userManagementService;
-    private final TokenBlacklistService tokenBlacklistService;
     private final JwtProvider jwtProvider;
 
+    // 회원가입용 이메일 인증 코드 발송 요청 (재전송 쿨다운·횟수 제한 적용)
     @PostMapping("/email/verify-request")
     public ResponseEntity<Void> sendEmailVerify(@RequestBody @Valid EmailVerifyRequest emailVerifyRequest) {
         userEmailService.emailVerifyRequest(emailVerifyRequest.email());
         return ResponseEntity.noContent().build();
     }
 
+    // 이메일 인증 코드 확인 → 성공 시 가입 요청에 쓸 인증 토큰 발급
     @PostMapping("/email/verify-confirm")
     public ResponseEntity<EmailVerifyConfirmResponse> emailCodeConfirm(
             @RequestBody @Valid EmailVerifyConfirmRequest emailVerifyConfirmRequest) {
@@ -54,6 +57,7 @@ public class UserController {
         return ResponseEntity.ok(new EmailVerifyConfirmResponse(verificationToken));
     }
 
+    // 이메일 중복 여부 확인 (가입 폼 실시간 검사용)
     @PostMapping("/check-email")
     public ResponseEntity<EmailAvailableResponse> checkEmailAvailable(
             @RequestBody @Valid EmailAvailableRequest emailAvailableRequest) {
@@ -62,6 +66,7 @@ public class UserController {
         return ResponseEntity.ok(new EmailAvailableResponse(available));
     }
 
+    // 회원가입 (verify-confirm에서 받은 인증 토큰 필요, 역할은 MEMBER 고정)
     @PostMapping("/signup")
     public ResponseEntity<UserSignupResponse> doSignup(
             @RequestBody @Valid UserSignupRequest userSignupRequest) {
@@ -76,6 +81,7 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.CREATED).body(userSignupResponse);
     }
 
+    // 일반 회원 로그인 — access 토큰은 본문, refresh 토큰은 HttpOnly 쿠키. 관리자 계정은 이 경로로 로그인 불가
     @PostMapping("/login")
     public ResponseEntity<String> doLogin(
             @RequestBody @Valid UserLoginRequest userLoginRequest) {
@@ -101,6 +107,7 @@ public class UserController {
 
     }
 
+    // 로그아웃 — refresh 토큰 삭제 + 현재 access 토큰 블랙리스트 등록
     @PostMapping("/logout")
     public ResponseEntity<Void> doLogout(
             @RequestHeader(name = X_USER_ID) @Valid Long userId,
@@ -110,51 +117,7 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/reactive")
-    public ResponseEntity<UserLoginResponse> userReactive(
-            @RequestBody @Valid ReactiveRequest request) {
-
-        UserLoginResponse response = userEmailService.reactive(request.reactiveToken());
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/reactivate/email-verify-request")
-    public ResponseEntity<Void> userReactivateRequest(@RequestBody @Valid EmailVerifyRequest emailVerifyRequest) {
-        userEmailService.reactivateRequest(emailVerifyRequest.email());
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/reactivate/email-verify-confirm")
-    public ResponseEntity<UserLoginResponse> userReactiveConfirm(
-            @RequestBody @Valid EmailVerifyConfirmRequest emailVerifyConfirmRequest) {
-        UserLoginResponse userLoginResponse =
-                userEmailService.reactivateConfirm(emailVerifyConfirmRequest.email(), emailVerifyConfirmRequest.code());
-
-        return ResponseEntity.ok(userLoginResponse);
-    }
-
-    @PostMapping("/find-email")
-    public ResponseEntity<String> findEmail(@RequestBody @Valid FindEmailRequest findEmailRequest) {
-        String email = userManagementService.findMaskedEmail(findEmailRequest.userName(), findEmailRequest.phoneNumber());
-
-        return ResponseEntity.ok(email);
-    }
-
-    @PostMapping("/password/reset-request")
-    public ResponseEntity<Void> passwordReset(@RequestBody @Valid PasswordResetRequest passwordResetRequest) {
-        userEmailService.passwordResetRequest(passwordResetRequest.email());
-        return ResponseEntity.noContent().build();
-    }
-
-    // 비밀번호 재설시 전과 동일한비밀번호는 막게 수정
-    @PostMapping("/password/reset-confirm")
-    public ResponseEntity<Void> passwordResetConfirm(
-            @RequestBody @Valid PasswordResetConfirmRequest passwordResetConfirmRequest) {
-        userEmailService.passwordResetConfirm(passwordResetConfirmRequest.token(), passwordResetConfirmRequest.password());
-
-        return ResponseEntity.ok().build();
-    }
-
+    // 소셜 로그인 (provider: google, github ...) — 연동 계정이 없으면 신규 가입 처리
     @PostMapping("/oauth/{provider}")
     public ResponseEntity<UserLoginResponse> oauthLogin(
             @PathVariable String provider,
@@ -164,7 +127,7 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-    // (refreshToken에서 userId 추출 — 방식은 createRefreshToken에 따라)
+    // refresh 토큰 쿠키로 새 access 토큰 재발급 (쿠키 없음/서명·만료 오류면 예외)
     @PostMapping("/refresh")
     public ResponseEntity<TokenRefreshResponse> refresh(
             @CookieValue("refreshToken") String refreshToken) {
@@ -185,12 +148,5 @@ public class UserController {
         TokenRefreshResponse tokenRefreshResponse =
                 userAuthenticationService.refresh(userId, refreshToken);
         return ResponseEntity.ok(tokenRefreshResponse);
-    }
-
-    @GetMapping("/tokens/{jti}/blacklisted")
-    public ResponseEntity<Boolean> blacklistedCheck(
-            @PathVariable("jti") @NotBlank String jti) {
-        boolean blacklisted = tokenBlacklistService.isBlacklisted(jti);
-        return ResponseEntity.ok(blacklisted);
     }
 }
