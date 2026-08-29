@@ -97,6 +97,17 @@ class OauthRepositoryTest {
     }
 
     @Test
+    @DisplayName("연동 정보 없는 user는 개수 0 반환")
+    void countByUser_whenNoOauth_returnsZero() {
+        User noOauthUser = new User("nooauth@test.com", "nooauth", "01077776666");
+        userRepository.save(noOauthUser);
+
+        Long count = oauthRepository.countByUser(noOauthUser);
+
+        assertThat(count).isZero();
+    }
+
+    @Test
     @DisplayName("user로 연동 정보 전체 삭제, 다른 사용자 유지 확인")
     void deleteByUser_removesOnlyOwnOauths() {
         oauthRepository.save(new Oauth(user1, "github", "github-provider-id-456"));
