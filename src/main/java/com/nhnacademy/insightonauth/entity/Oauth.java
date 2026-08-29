@@ -1,5 +1,6 @@
 package com.nhnacademy.insightonauth.entity;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -43,5 +44,30 @@ public class Oauth {
 
     public void reassignUser(User newUser) {
         this.user = newUser;
+    }
+
+    /**
+     * 탈퇴 시 provider_user_id 에 접미사를 붙여 유니크 제약을 비켜준다.
+     * 이미 마스킹돼 있으면 아무것도 하지 않는다.
+     */
+    public void maskForWithdrawal() {
+        if (isMasked()) {
+            return;
+        }
+        this.providerUserId = this.providerUserId + ";" + UuidCreator.getTimeOrderedEpoch();
+    }
+
+    /** 복구 시 원본 provider_user_id 로 되돌린다. */
+    public void unmask() {
+        this.providerUserId = reactivatedProviderUserId();
+    }
+
+    public boolean isMasked() {
+        return this.providerUserId.contains(";");
+    }
+
+    /** 마스킹 접미사를 뗀 원본 provider_user_id (마스킹 안 됐으면 그대로). */
+    public String reactivatedProviderUserId() {
+        return this.providerUserId.split(";")[0];
     }
 }

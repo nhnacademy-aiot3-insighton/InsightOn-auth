@@ -35,4 +35,40 @@ class OauthTest {
 
         assertThat(oauth.getUser()).isEqualTo(newUser);
     }
+
+    @Test
+    @DisplayName("maskForWithdrawal 시 provider_user_id에 접미사 부착")
+    void maskForWithdrawal_appendsSuffix() {
+        Oauth oauth = new Oauth(user, "google", "pid-123");
+
+        oauth.maskForWithdrawal();
+
+        assertThat(oauth.getProviderUserId()).startsWith("pid-123;");
+        assertThat(oauth.isMasked()).isTrue();
+        assertThat(oauth.reactivatedProviderUserId()).isEqualTo("pid-123");
+    }
+
+    @Test
+    @DisplayName("이미 마스킹된 경우 maskForWithdrawal은 중복 부착하지 않음")
+    void maskForWithdrawal_whenAlreadyMasked_noop() {
+        Oauth oauth = new Oauth(user, "google", "pid-123");
+        oauth.maskForWithdrawal();
+        String masked = oauth.getProviderUserId();
+
+        oauth.maskForWithdrawal();
+
+        assertThat(oauth.getProviderUserId()).isEqualTo(masked);
+    }
+
+    @Test
+    @DisplayName("unmask 시 원본 provider_user_id로 복원")
+    void unmask_restoresOriginal() {
+        Oauth oauth = new Oauth(user, "google", "pid-123");
+        oauth.maskForWithdrawal();
+
+        oauth.unmask();
+
+        assertThat(oauth.getProviderUserId()).isEqualTo("pid-123");
+        assertThat(oauth.isMasked()).isFalse();
+    }
 }

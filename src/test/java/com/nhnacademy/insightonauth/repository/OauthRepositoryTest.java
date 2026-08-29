@@ -77,6 +77,29 @@ class OauthRepositoryTest {
     }
 
     @Test
+    @DisplayName("마스킹된 provider_user_id를 원본 접두어로 조회")
+    void findByProviderAndProviderUserIdStartingWith_findsMaskedRow() {
+        Oauth oauth = oauthRepository.findByUser(user1).getFirst();
+        oauth.maskForWithdrawal();
+        oauthRepository.saveAndFlush(oauth);
+
+        List<Oauth> found = oauthRepository.findByProviderAndProviderUserIdStartingWith(
+                "google", "google-provider-id-123;");
+
+        assertThat(found).hasSize(1);
+        assertThat(found.getFirst().getUser().getUserId()).isEqualTo(user1.getUserId());
+    }
+
+    @Test
+    @DisplayName("접두어로 조회 시 다른 provider_user_id는 매칭되지 않음")
+    void findByProviderAndProviderUserIdStartingWith_doesNotMatchOthers() {
+        List<Oauth> found = oauthRepository.findByProviderAndProviderUserIdStartingWith(
+                "google", "google-provider-id-123;");
+
+        assertThat(found).isEmpty();
+    }
+
+    @Test
     @DisplayName("user로 연동 목록 조회, 다른 사용자 제외 확인")
     void findByUser_returnsOnlyOwnOauthList() {
         List<Oauth> result = oauthRepository.findByUser(user1);

@@ -8,6 +8,7 @@ import com.nhnacademy.insightonauth.dto.mypage.RoleResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.entity.Oauth;
+import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserCredential;
 import com.nhnacademy.insightonauth.exception.*;
@@ -100,14 +101,17 @@ public class MyPageServiceImpl implements MyPageService {
         if (conflictingOauth.isPresent()) {
             User conflictingUser = conflictingOauth.get().getUser();
 
-            if (conflictingUser.getUserId().equals(primaryUser.getUserId())) {
+            if (conflictingUser.getStatus() == Status.WITHDRAW) {
+                // 탈퇴 계정에 묶여 있던 연동 → 충돌로 보지 않고 식별자를 비운 뒤 새로 연동
+                oauthService.maskByUser(conflictingUser);
+            } else if (conflictingUser.getUserId().equals(primaryUser.getUserId())) {
                 throw new OauthAlreadyLinkedException("이미 연동된 소셜 계정입니다.");
+            } else {
+                // 다른 사람 계정에 연동되어 있음 → "병합할지" 물어봐야 하는 상황
+                throw new OauthLinkedToOtherAccountException(
+                        "이 계정은 이미 다른 계정에 연동되어 있습니다. 병합하시려면 확인 후 다시 요청해주세요.",
+                        conflictingUser.getUserId());
             }
-
-            // 다른 사람 계정에 연동되어 있음 → "병합할지" 물어봐야 하는 상황
-            throw new OauthLinkedToOtherAccountException(
-                    "이 계정은 이미 다른 계정에 연동되어 있습니다. 병합하시려면 확인 후 다시 요청해주세요.",
-                    conflictingUser.getUserId());
         }
 
         oauthService.create(primaryUser, provider, userInfo.providerId());

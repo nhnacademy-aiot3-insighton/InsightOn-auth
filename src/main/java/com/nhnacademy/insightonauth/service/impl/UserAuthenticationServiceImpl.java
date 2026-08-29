@@ -54,7 +54,8 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
 
         // 유저 계정 존재 여부 숨기기
         // 기존대로 UserNotFound로 하는건 어떤가
-        User user = userRepository.findByEmail(email)
+        // 탈퇴(마스킹) 계정도 복구 기간 내면 찾아야 하므로 findReactivatableByEmail 사용
+        User user = userManagementService.findReactivatableByEmail(email)
                 .orElseThrow(() -> new InvalidCredentialsException("유저를 찾을 수 없습니다."));
         UserCredential credential = userCredentialService.findByUser(user);
 
@@ -106,20 +107,30 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
 
         if (existingOauth.isPresent()) {
             User user = existingOauth.get().getUser();
-            // 탈퇴 상태 체크
+            // 탈퇴 상태 체크 (마스킹 전 레거시 연동 행)
             if (user.getStatus() == Status.WITHDRAW) {
                 if (tokenService.isWithinRestorePeriod(user)) {
                     return tokenService.handleWithdrawnLogin(user);
                 }
-                throw new RestorePeriodExpiredException("탈퇴 복구 가능 기간(7일)이 지났습니다.");
-            }
+                // 복구 기간 만료 → 식별자를 비워 아래에서 새 계정으로 가입
+                oauthService.maskByUser(user);
+            } else {
+                if (!user.getStatus().isLoginable()) {
+                    throw new InvalidUserException(user.getStatus().getMessage());
+                }
 
-            if (!user.getStatus().isLoginable()) {
-                throw new InvalidUserException(user.getStatus().getMessage());
+                user.updateLastLoginAt();
+                return tokenService.issueTokens(user, user.getEmail());
             }
-
-            user.updateLastLoginAt();
-            return tokenService.issueTokens(user, user.getEmail());
+        } else {
+            // 마스킹된(탈퇴) 연동을 원본 식별자로 조회 — 복구 기간 내면 복구 유도
+            Optional<Oauth> withdrawnOauth =
+                    oauthService.findReactivatableByProviderAndProviderUserId(provider, userInfo.providerId());
+            if (withdrawnOauth.isPresent()
+                    && tokenService.isWithinRestorePeriod(withdrawnOauth.get().getUser())) {
+                return tokenService.handleWithdrawnLogin(withdrawnOauth.get().getUser());
+            }
+            // 만료됐거나 연동 없음 → 아래에서 새 계정으로 가입
         }
 
         // 새 User 만들기 전에, 이 이메일이 이미 가입돼 있는지 확인
