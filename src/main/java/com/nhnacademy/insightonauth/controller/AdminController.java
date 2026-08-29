@@ -7,7 +7,7 @@ import com.nhnacademy.insightonauth.dto.admin.RoleChangeRequest;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginRequest;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
 import com.nhnacademy.insightonauth.entity.Status;
-import com.nhnacademy.insightonauth.exception.InvalidCredentialsException;
+import com.nhnacademy.insightonauth.exception.auth.InvalidCredentialsException;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.service.AdminUserService;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;

@@ -2,7 +2,7 @@ package com.nhnacademy.insightonauth.client.impl;
 
 import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
-import com.nhnacademy.insightonauth.exception.EmailNotFoundException;
+import com.nhnacademy.insightonauth.exception.email.EmailNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;

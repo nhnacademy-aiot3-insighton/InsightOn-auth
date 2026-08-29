@@ -2,7 +2,7 @@ package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.client.CoreClient;
 import com.nhnacademy.insightonauth.dto.core.UserGroupResponse;
-import com.nhnacademy.insightonauth.exception.CoreServiceUnavailableException;
+import com.nhnacademy.insightonauth.exception.external.CoreServiceUnavailableException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

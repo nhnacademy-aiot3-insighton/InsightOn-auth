@@ -1,6 +1,6 @@
 package com.nhnacademy.insightonauth.redis;
 
-import com.nhnacademy.insightonauth.exception.RedisOperationException;
+import com.nhnacademy.insightonauth.exception.external.RedisOperationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;

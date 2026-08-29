@@ -2,8 +2,8 @@ package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserCredential;
-import com.nhnacademy.insightonauth.exception.SameAsOldPasswordException;
-import com.nhnacademy.insightonauth.exception.UserCredentialsNotFoundException;
+import com.nhnacademy.insightonauth.exception.user.SameAsOldPasswordException;
+import com.nhnacademy.insightonauth.exception.user.UserCredentialsNotFoundException;
 import com.nhnacademy.insightonauth.repository.UserCredentialRepository;
 import com.nhnacademy.insightonauth.service.UserCredentialService;
 import lombok.RequiredArgsConstructor;
