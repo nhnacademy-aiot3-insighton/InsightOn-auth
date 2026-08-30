@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -146,7 +147,7 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("POST /login — 200, body=accessToken, refreshToken 쿠키")
+    @DisplayName("POST /login — 200, status=SUCCESS + accessToken, refreshToken 쿠키")
     void login() throws Exception {
         when(userAuthenticationService.login("user@test.com", "Abcd1234!"))
                 .thenReturn(UserLoginResponse.success("access-xyz", "refresh-abc"));
@@ -158,10 +159,31 @@ class AuthControllerTest {
                                 { "email": "user@test.com", "password": "Abcd1234!" }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(content().string("access-xyz"))
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.accessToken").value("access-xyz"))
                 .andExpect(cookie().value("refreshToken", "refresh-abc"))
                 .andExpect(cookie().httpOnly("refreshToken", true))
                 .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("SameSite=Lax")));
+    }
+
+    @Test
+    @DisplayName("POST /login — 탈퇴 복구 가능 계정은 200 PENDING_RESTORE + restoreToken (500 아님)")
+    void login_pendingRestore() throws Exception {
+        when(userAuthenticationService.login("gone@test.com", "Abcd1234!"))
+                .thenReturn(UserLoginResponse.pendingRestore("restore-tok"));
+
+        mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "gone@test.com", "password": "Abcd1234!" }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_RESTORE"))
+                .andExpect(jsonPath("$.restoreToken").value("restore-tok"))
+                .andExpect(jsonPath("$.accessToken").isEmpty())
+                .andExpect(header().doesNotExist("Set-Cookie"));
+
+        verifyNoInteractions(jwtProvider);   // 토큰이 없으므로 admin 체크를 하지 않는다
     }
 
     @Test

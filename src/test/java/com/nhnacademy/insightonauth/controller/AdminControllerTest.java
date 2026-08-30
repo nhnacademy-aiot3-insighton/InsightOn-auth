@@ -31,6 +31,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -69,6 +70,25 @@ class AdminControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(cookie().value("refreshToken", "admin-ref"));
+    }
+
+    @Test
+    @DisplayName("POST /login — 탈퇴 복구 가능 관리자 계정은 200 PENDING_RESTORE (500 아님)")
+    void adminLogin_pendingRestore() throws Exception {
+        when(userAuthenticationService.login("admin@test.com", "Abcd1234!"))
+                .thenReturn(UserLoginResponse.pendingRestore("restore-tok"));
+
+        mvc.perform(post("/api/v1/admin/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "admin@test.com", "password": "Abcd1234!" }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_RESTORE"))
+                .andExpect(jsonPath("$.restoreToken").value("restore-tok"))
+                .andExpect(jsonPath("$.accessToken").isEmpty());
+
+        verifyNoInteractions(jwtProvider);
     }
 
     @Test
