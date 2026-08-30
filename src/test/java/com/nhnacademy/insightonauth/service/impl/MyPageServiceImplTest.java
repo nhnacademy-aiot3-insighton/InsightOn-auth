@@ -139,6 +139,18 @@ class MyPageServiceImplTest {
     }
 
     @Test
+    @DisplayName("linkOauth - 이미 같은 provider 연동돼 있으면 외부 OAuth 호출 없이 예외")
+    void linkOauth_providerAlreadyLinked() {
+        when(userManagementService.findById(1L)).thenReturn(user);
+        when(oauthService.hasProviderLinked(user, "google")).thenReturn(true);
+
+        assertThatThrownBy(() -> myPageService.linkOauth(1L, "google", "code"))
+                .isInstanceOf(OauthAlreadyLinkedException.class);
+
+        verifyNoInteractions(oauthClientResolver, oauthClient);
+    }
+
+    @Test
     @DisplayName("linkOauth - 이미 내 계정에 연동돼 있으면 예외")
     void linkOauth_alreadyLinked() {
         when(userManagementService.findById(1L)).thenReturn(user);

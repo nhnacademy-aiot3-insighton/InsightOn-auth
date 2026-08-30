@@ -20,6 +20,9 @@ public interface OauthService {
 
     Optional<Oauth> findByProviderAndProviderUserId(String provider, String providerUserId);
 
+    /** 이 유저가 해당 provider 소셜 계정을 이미 연동했는지 여부 (계정당 provider 1개 제한용). */
+    boolean hasProviderLinked(User user, String provider);
+
     /** 유저의 모든 연동 행에 탈퇴 마스킹 접미사를 붙인다. */
     void maskByUser(User user);
 

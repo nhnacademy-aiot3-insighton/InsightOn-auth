@@ -11,6 +11,8 @@ public interface OauthRepository extends JpaRepository<Oauth, Long> {
 
     Optional<Oauth> findByUserAndProvider(User user, String provider);
 
+    boolean existsByUserAndProvider(User user, String provider);
+
     Optional<Oauth> findByProviderAndProviderUserId(String provider, String providerUserId);
 
     List<Oauth> findByProviderAndProviderUserIdStartingWithOrderByUserWithdrawnAtDesc(

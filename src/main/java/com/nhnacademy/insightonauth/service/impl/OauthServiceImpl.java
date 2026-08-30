@@ -77,6 +77,12 @@ public class OauthServiceImpl implements OauthService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public boolean hasProviderLinked(User user, String provider) {
+        return oauthRepository.existsByUserAndProvider(user, provider);
+    }
+
+    @Override
     public void maskByUser(User user) {
         oauthRepository.findByUser(user).forEach(Oauth::maskForWithdrawal);
         // 같은 트랜잭션에서 곧바로 동일 식별자로 새 연동을 INSERT 하는 경우가 있어,
