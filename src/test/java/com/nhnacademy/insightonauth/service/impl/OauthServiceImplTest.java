@@ -4,6 +4,7 @@ import com.nhnacademy.insightonauth.entity.Oauth;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.exception.oauth.LastLoginMethodException;
+import com.nhnacademy.insightonauth.exception.oauth.OauthAlreadyLinkedException;
 import com.nhnacademy.insightonauth.exception.oauth.OauthNotFoundException;
 import com.nhnacademy.insightonauth.exception.user.ReactivationConflictException;
 import com.nhnacademy.insightonauth.repository.OauthRepository;
@@ -52,9 +53,22 @@ class OauthServiceImplTest {
     @Test
     @DisplayName("create는 Oauth를 저장")
     void create() {
+        when(oauthRepository.existsByUserAndProvider(user, "google")).thenReturn(false);
+
         oauthService.create(user, "google", "pid-1");
 
         verify(oauthRepository).save(any(Oauth.class));
+    }
+
+    @Test
+    @DisplayName("create - 이미 같은 provider 연동돼 있으면 예외, save 안 함")
+    void create_alreadyLinked() {
+        when(oauthRepository.existsByUserAndProvider(user, "google")).thenReturn(true);
+
+        assertThatThrownBy(() -> oauthService.create(user, "google", "pid-1"))
+                .isInstanceOf(OauthAlreadyLinkedException.class);
+
+        verify(oauthRepository, never()).save(any());
     }
 
     @Test

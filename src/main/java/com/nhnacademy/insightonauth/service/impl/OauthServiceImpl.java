@@ -4,6 +4,7 @@ import com.nhnacademy.insightonauth.entity.Oauth;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.exception.oauth.LastLoginMethodException;
+import com.nhnacademy.insightonauth.exception.oauth.OauthAlreadyLinkedException;
 import com.nhnacademy.insightonauth.exception.oauth.OauthNotFoundException;
 import com.nhnacademy.insightonauth.exception.user.ReactivationConflictException;
 import com.nhnacademy.insightonauth.repository.OauthRepository;
@@ -26,8 +27,11 @@ public class OauthServiceImpl implements OauthService {
 
     @Override
     public void create(User user, String provider, String providerUserId) {
-        Oauth oauth = new Oauth(user, provider, providerUserId);
-        oauthRepository.save(oauth);
+        // 계정당 provider 1개 — save 직전 재검사
+        if (oauthRepository.existsByUserAndProvider(user, provider)) {
+            throw new OauthAlreadyLinkedException("이미 " + provider + " 계정이 연동되어 있습니다.");
+        }
+        oauthRepository.save(new Oauth(user, provider, providerUserId));
     }
 
     // 연동 삭제
