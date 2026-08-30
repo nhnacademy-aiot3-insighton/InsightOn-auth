@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.controller;
 
 import com.nhnacademy.insightonauth.entity.User;
-import com.nhnacademy.insightonauth.exception.UserNotFoundException;
+import com.nhnacademy.insightonauth.exception.user.UserNotFoundException;
 import com.nhnacademy.insightonauth.handler.GlobalExceptionHandler;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
 import com.nhnacademy.insightonauth.service.UserManagementService;

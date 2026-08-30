@@ -3,7 +3,7 @@ package com.nhnacademy.insightonauth.service.impl;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserRole;
-import com.nhnacademy.insightonauth.exception.UserRoleNotFoundException;
+import com.nhnacademy.insightonauth.exception.user.UserRoleNotFoundException;
 import com.nhnacademy.insightonauth.repository.UserRoleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

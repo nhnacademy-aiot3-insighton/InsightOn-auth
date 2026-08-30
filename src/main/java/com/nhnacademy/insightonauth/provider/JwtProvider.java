@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.provider;
 
-import com.nhnacademy.insightonauth.exception.InvalidRefreshTokenException;
-import com.nhnacademy.insightonauth.exception.RefreshTokenNotFoundException;
+import com.nhnacademy.insightonauth.exception.auth.InvalidRefreshTokenException;
+import com.nhnacademy.insightonauth.exception.auth.RefreshTokenNotFoundException;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import io.jsonwebtoken.Claims;

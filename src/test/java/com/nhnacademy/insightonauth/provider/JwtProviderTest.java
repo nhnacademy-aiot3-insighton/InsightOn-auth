@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.provider;
 
-import com.nhnacademy.insightonauth.exception.InvalidRefreshTokenException;
-import com.nhnacademy.insightonauth.exception.RefreshTokenNotFoundException;
+import com.nhnacademy.insightonauth.exception.auth.InvalidRefreshTokenException;
+import com.nhnacademy.insightonauth.exception.auth.RefreshTokenNotFoundException;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -19,7 +19,6 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;

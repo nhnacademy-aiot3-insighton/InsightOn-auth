@@ -1,6 +1,6 @@
 package com.nhnacademy.insightonauth.entity;
 
-import com.nhnacademy.insightonauth.exception.InvalidUserStatusException;
+import com.nhnacademy.insightonauth.exception.user.InvalidUserStatusException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

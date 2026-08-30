@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.entity;
 
 import com.github.f4b6a3.uuid.UuidCreator;
-import com.nhnacademy.insightonauth.exception.InvalidUserStatusException;
+import com.nhnacademy.insightonauth.exception.user.InvalidUserStatusException;
 import com.nhnacademy.insightonauth.util.WithdrawalMask;
 import jakarta.persistence.*;
 import lombok.*;
