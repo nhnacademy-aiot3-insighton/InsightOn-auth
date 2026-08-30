@@ -94,6 +94,12 @@ public class MyPageServiceImpl implements MyPageService {
     @Override
     public void linkOauth(Long userId, String provider, String code) {
         User primaryUser = userManagementService.findById(userId);
+
+        // 계정당 provider 하나만 연동 허용 — 외부 OAuth 왕복 전에 차단 (불필요한 provider 호출·code 소모 방지)
+        if (oauthService.hasProviderLinked(primaryUser, provider)) {
+            throw new OauthAlreadyLinkedException("이미 " + provider + " 계정이 연동되어 있습니다.");
+        }
+
         OauthClient oauthClient = oauthClientResolver.resolve(provider);
         OauthUserInfo userInfo = oauthClient.getUserInfo(code);
 
