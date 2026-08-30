@@ -83,10 +83,15 @@ public class AuthController {
 
     // 일반 회원 로그인 — access 토큰은 본문, refresh 토큰은 HttpOnly 쿠키. 관리자 계정은 이 경로로 로그인 불가
     @PostMapping("/login")
-    public ResponseEntity<String> doLogin(
+    public ResponseEntity<LoginResponse> doLogin(
             @RequestBody @Valid UserLoginRequest userLoginRequest) {
         UserLoginResponse userLoginResponse = userAuthenticationService.login(userLoginRequest.email(), userLoginRequest.password());
 
+        // 탈퇴 후 복구 가능 기간 내 계정 — 로그인 성공이 아니라 "복구 안내" 상태.
+        // accessToken 이 없으므로 admin 체크(hasAdminRole) 대상이 아니다.
+        if ("PENDING_RESTORE".equals(userLoginResponse.status())) {
+            return ResponseEntity.ok(LoginResponse.pendingRestore(userLoginResponse.restoreToken()));
+        }
 
         if (jwtProvider.hasAdminRole(userLoginResponse.accessToken())) {
             // 계정 열거 방지: 관리자 아님 / 비번 오류 / 없는 계정 모두 동일 메시지
@@ -103,7 +108,7 @@ public class AuthController {
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())   // refresh 쿠키 헤더에 설정
-                .body(userLoginResponse.accessToken());
+                .body(LoginResponse.success(userLoginResponse.accessToken()));
 
     }
 

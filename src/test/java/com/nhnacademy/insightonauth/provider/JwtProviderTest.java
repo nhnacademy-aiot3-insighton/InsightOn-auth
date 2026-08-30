@@ -193,12 +193,12 @@ class JwtProviderTest {
     }
 
     @Test
-    @DisplayName("hasAdminRole — null 토큰이면 현재 IllegalArgumentException (로그인 500 버그의 원인)")
-    void hasAdminRole_null_currentBehavior() {
-        // extractRoles가 parse(null)의 IllegalArgumentException을 잡지 않음.
-        // 복구기간 내 탈퇴계정이 비밀번호 로그인하면 accessToken=null로 여기 도달 → 500.
-        // 버그 픽스 시 이 테스트를 "false 반환" 기대로 바꿀 것.
-        assertThatThrownBy(() -> jwtProvider.hasAdminRole(null))
-                .isInstanceOf(IllegalArgumentException.class);
+    @DisplayName("hasAdminRole — null/빈 토큰이면 false (복구 대기 응답 등)")
+    void hasAdminRole_nullOrBlank() {
+        // 복구기간 내 탈퇴계정이 비밀번호 로그인하면 accessToken=null 로 여기 도달할 수 있다.
+        // 예외 대신 false 를 반환해 컨트롤러의 500 을 막는다.
+        assertThat(jwtProvider.hasAdminRole(null)).isFalse();
+        assertThat(jwtProvider.hasAdminRole("")).isFalse();
+        assertThat(jwtProvider.hasAdminRole("   ")).isFalse();
     }
 }
