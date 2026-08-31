@@ -1,12 +1,13 @@
 package com.nhnacademy.insightonauth.provider;
 
-import com.nhnacademy.insightonauth.exception.InvalidRefreshTokenException;
-import com.nhnacademy.insightonauth.exception.RefreshTokenNotFoundException;
+import com.nhnacademy.insightonauth.exception.auth.InvalidRefreshTokenException;
+import com.nhnacademy.insightonauth.exception.auth.RefreshTokenNotFoundException;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -20,6 +21,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
+@Slf4j
 @Component
 public class JwtProvider {
 
@@ -138,9 +140,15 @@ public class JwtProvider {
 
     /**
      * accessToken의 roles 클레임에 ADMIN이 포함되어 있는지 타입 안전하게 검사한다.
-     * roles가 없거나 형식이 예상과 다르면 false를 반환한다.
+     * 토큰이 null/빈 문자열이거나(예: 복구 대기 응답), roles가 없거나 형식이 예상과 다르면 false를 반환한다.
      */
     public boolean hasAdminRole(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            // 정상 경로: PENDING_RESTORE 응답은 컨트롤러에서 이미 걸러지므로 여기 도달하지 않는다.
+            // 여기 도달했다면 다른 곳에서 토큰 없이 admin 검사를 호출한 것 → 관리자 아님으로 처리하되 흔적을 남긴다.
+            log.warn("hasAdminRole 에 null/빈 accessToken 전달됨 — 비관리자로 처리");
+            return false;
+        }
         return extractRoles(accessToken).contains("ADMIN");
     }
 

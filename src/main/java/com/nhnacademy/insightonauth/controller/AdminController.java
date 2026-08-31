@@ -4,10 +4,11 @@ package com.nhnacademy.insightonauth.controller;
 import com.nhnacademy.insightonauth.dto.admin.AdminFindUsersResponse;
 import com.nhnacademy.insightonauth.dto.admin.AdminUserDetailResponse;
 import com.nhnacademy.insightonauth.dto.admin.RoleChangeRequest;
+import com.nhnacademy.insightonauth.dto.auth.LoginResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginRequest;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
 import com.nhnacademy.insightonauth.entity.Status;
-import com.nhnacademy.insightonauth.exception.InvalidCredentialsException;
+import com.nhnacademy.insightonauth.exception.auth.InvalidCredentialsException;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.service.AdminUserService;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
@@ -35,9 +36,15 @@ public class AdminController {
     private final JwtProvider jwtProvider;
 
     @PostMapping("/login")
-    public ResponseEntity<String> doLogin(
+    public ResponseEntity<LoginResponse> doLogin(
             @RequestBody @Valid UserLoginRequest userLoginRequest) {
         UserLoginResponse userLoginResponse = userAuthenticationService.login(userLoginRequest.email(), userLoginRequest.password());
+
+        // 탈퇴 후 복구 가능 기간 내 관리자 계정 — 로그인 성공이 아니라 "복구 안내" 상태.
+        // accessToken 이 없으므로 admin 체크(hasAdminRole) 대상이 아니다.
+        if ("PENDING_RESTORE".equals(userLoginResponse.status())) {
+            return ResponseEntity.ok(LoginResponse.pendingRestore(userLoginResponse.restoreToken()));
+        }
 
         // 공통 검증기 사용 — 타입 안전, roles 없음/형식오류는 안전하게 false
         if (!jwtProvider.hasAdminRole(userLoginResponse.accessToken())) {
@@ -56,7 +63,7 @@ public class AdminController {
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())   // refresh 쿠키 헤더에 설정
-                .body(userLoginResponse.accessToken());
+                .body(LoginResponse.success(userLoginResponse.accessToken()));
 
     }
 

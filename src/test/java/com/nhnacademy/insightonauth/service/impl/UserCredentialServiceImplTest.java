@@ -2,7 +2,8 @@ package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserCredential;
-import com.nhnacademy.insightonauth.exception.UserCredentialsNotFoundException;
+import com.nhnacademy.insightonauth.exception.user.SameAsOldPasswordException;
+import com.nhnacademy.insightonauth.exception.user.UserCredentialsNotFoundException;
 import com.nhnacademy.insightonauth.repository.UserCredentialRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,7 +17,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -68,8 +68,7 @@ class UserCredentialServiceImplTest {
     @Test
     @DisplayName("자격 증명이 없으면 예외 발생")
     void findByUser_notExists() {
-        when(userCredentialRepository.findByUser(user))
-                .thenThrow(new UserCredentialsNotFoundException("유저 인증 정보가 없습니다."));
+        when(userCredentialRepository.findByUser(user)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> userCredentialService.findByUser(user))
                 .isInstanceOf(UserCredentialsNotFoundException.class)
@@ -88,16 +87,32 @@ class UserCredentialServiceImplTest {
     }
 
     @Test
-    @DisplayName("비밀번호 변경됨")
+    @DisplayName("비밀번호 변경됨 - 기존과 다르면 암호화 후 저장")
     void updatePassword() {
         UserCredential userCredential = mock(UserCredential.class);
         when(userCredentialRepository.findByUser(user)).thenReturn(Optional.of(userCredential));
+        when(userCredential.getPasswordHash()).thenReturn("old-hash");
+        when(passwordEncoder.matches("test1234!", "old-hash")).thenReturn(false);
         when(passwordEncoder.encode("test1234!")).thenReturn("!1234test");
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         userCredentialService.updatePassword(now, user, "test1234!");
 
         verify(userCredential, times(1)).changePassword(now, "!1234test");
+    }
+
+    @Test
+    @DisplayName("비밀번호 변경 - 새 비밀번호가 기존과 같으면 예외 (마이페이지/이메일 재설정 공통)")
+    void updatePassword_sameAsOld() {
+        UserCredential userCredential = mock(UserCredential.class);
+        when(userCredentialRepository.findByUser(user)).thenReturn(Optional.of(userCredential));
+        when(userCredential.getPasswordHash()).thenReturn("old-hash");
+        when(passwordEncoder.matches("samePw", "old-hash")).thenReturn(true);
+
+        assertThatThrownBy(() -> userCredentialService.updatePassword(
+                OffsetDateTime.now(ZoneOffset.UTC), user, "samePw"))
+                .isInstanceOf(SameAsOldPasswordException.class);
+        verify(userCredential, never()).changePassword(any(), any());
     }
 
     @Test

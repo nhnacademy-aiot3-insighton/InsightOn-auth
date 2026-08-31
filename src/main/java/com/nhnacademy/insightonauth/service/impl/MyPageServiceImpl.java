@@ -11,6 +11,12 @@ import com.nhnacademy.insightonauth.entity.Oauth;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserCredential;
 import com.nhnacademy.insightonauth.exception.*;
+import com.nhnacademy.insightonauth.exception.auth.*;
+import com.nhnacademy.insightonauth.exception.user.*;
+import com.nhnacademy.insightonauth.exception.email.*;
+import com.nhnacademy.insightonauth.exception.signup.*;
+import com.nhnacademy.insightonauth.exception.oauth.*;
+import com.nhnacademy.insightonauth.exception.external.*;
 import com.nhnacademy.insightonauth.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -57,13 +63,9 @@ public class MyPageServiceImpl implements MyPageService {
         User user = userManagementService.findById(userId);
         UserCredential userCredential = userCredentialService.findByUser(user);
 
-        // 기존 비밀번호와 동일하게 변경할 수 없게 만들기
+        // 현재 비밀번호 확인 (새 비밀번호가 기존과 같은지는 updatePassword에서 검사)
         if (!passwordEncoder.matches(currentPassword, userCredential.getPasswordHash())) {
             throw new InvalidCredentialsException("기존 비밀번호가 올바르지 않습니다.");
-        }
-        // 새 비밀번호가 기존과 같은지 확인
-        if (passwordEncoder.matches(newPassword, userCredential.getPasswordHash())) {
-            throw new SameAsOldPasswordException("새 비밀번호는 기존 비밀번호와 달라야 합니다.");
         }
 
         userCredentialService.updatePassword(OffsetDateTime.now(ZoneOffset.UTC), user, newPassword);
@@ -92,6 +94,12 @@ public class MyPageServiceImpl implements MyPageService {
     @Override
     public void linkOauth(Long userId, String provider, String code) {
         User primaryUser = userManagementService.findById(userId);
+
+        // 계정당 provider 하나만 연동 허용 — 외부 OAuth 왕복 전에 차단 (불필요한 provider 호출·code 소모 방지)
+        if (oauthService.hasProviderLinked(primaryUser, provider)) {
+            throw new OauthAlreadyLinkedException("이미 " + provider + " 계정이 연동되어 있습니다.");
+        }
+
         OauthClient oauthClient = oauthClientResolver.resolve(provider);
         OauthUserInfo userInfo = oauthClient.getUserInfo(code);
 

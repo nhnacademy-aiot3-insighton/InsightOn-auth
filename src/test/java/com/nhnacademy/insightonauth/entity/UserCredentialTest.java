@@ -8,7 +8,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 class UserCredentialTest {
 
@@ -37,9 +36,12 @@ class UserCredentialTest {
         UserCredential credential = new UserCredential(user, "old-hashed-password");
         OffsetDateTime newTime = OffsetDateTime.now(ZoneOffset.UTC).plusDays(1);
 
+        OffsetDateTime originalCreatedAt = credential.getCreatedAt();
+
         credential.changePassword(newTime, "new-hashed-password");
 
         assertThat(credential.getPasswordHash()).isEqualTo("new-hashed-password");
         assertThat(credential.getUpdatedAt()).isEqualTo(newTime);
+        assertThat(credential.getCreatedAt()).isEqualTo(originalCreatedAt);
     }
 }

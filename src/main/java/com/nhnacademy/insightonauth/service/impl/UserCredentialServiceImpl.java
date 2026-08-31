@@ -2,7 +2,8 @@ package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserCredential;
-import com.nhnacademy.insightonauth.exception.UserCredentialsNotFoundException;
+import com.nhnacademy.insightonauth.exception.user.SameAsOldPasswordException;
+import com.nhnacademy.insightonauth.exception.user.UserCredentialsNotFoundException;
 import com.nhnacademy.insightonauth.repository.UserCredentialRepository;
 import com.nhnacademy.insightonauth.service.UserCredentialService;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,12 @@ public class UserCredentialServiceImpl implements UserCredentialService {
     @Override
     public void updatePassword(OffsetDateTime now, User user, String password) {
         UserCredential userCredential = findByUser(user);
+
+        // 마이페이지 변경 / 이메일 재설정 양쪽 모두 여기서 기존 비밀번호와 동일 여부를 검사한다
+        if (passwordEncoder.matches(password, userCredential.getPasswordHash())) {
+            throw new SameAsOldPasswordException("새 비밀번호는 기존 비밀번호와 달라야 합니다.");
+        }
+
         userCredential.changePassword(now, passwordEncoder.encode(password));
     }
 

@@ -6,6 +6,12 @@ import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.exception.*;
+import com.nhnacademy.insightonauth.exception.auth.*;
+import com.nhnacademy.insightonauth.exception.user.*;
+import com.nhnacademy.insightonauth.exception.email.*;
+import com.nhnacademy.insightonauth.exception.signup.*;
+import com.nhnacademy.insightonauth.exception.oauth.*;
+import com.nhnacademy.insightonauth.exception.external.*;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.repository.UserRepository;
@@ -19,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -33,6 +40,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     private final EmailService emailService;
     private final RedisService redisService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final TokenService tokenService;
     private final CoreService coreService;
 
     @Override
@@ -75,6 +83,43 @@ public class UserManagementServiceImpl implements UserManagementService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<User> findReactivatableByEmail(String email) {
+        Optional<User> active = userRepository.findByEmail(email);
+        if (active.isPresent()) {
+            return active;
+        }
+        return userRepository
+                .findByEmailStartingWithAndStatusOrderByWithdrawnAtDesc(email + ";", Status.WITHDRAW)
+                .stream()
+                .findFirst();
+    }
+
+    @Override
+    public void reactivate(User user) {
+        if (user.getStatus() == Status.WITHDRAW) {
+            // 탈퇴 복구는 탈퇴 후 7일 이내만 가능 (휴면은 기간 제한 없음)
+            if (!tokenService.isWithinRestorePeriod(user)) {
+                throw new RestorePeriodExpiredException("탈퇴 복구 가능 기간(7일)이 지났습니다.");
+            }
+
+            String originalEmail = user.reactivatedEmail();
+            if (userRepository.existsByEmail(originalEmail)) {
+                throw new ReactivationConflictException("해당 이메일로 새 계정이 생성되어 복구할 수 없습니다.");
+            }
+
+            String originalPhone = user.reactivatedPhoneNumber();
+            if (originalPhone != null && userRepository.existsByPhoneNumber(originalPhone)) {
+                throw new ReactivationConflictException("해당 전화번호로 새 계정이 생성되어 복구할 수 없습니다.");
+            }
+
+            oauthService.reactivateByUser(user);
+        }
+
+        user.reactivate();
+    }
+
+    @Override
     public void activate(Long userId) {
         User user = findById(userId);
 
@@ -109,6 +154,7 @@ public class UserManagementServiceImpl implements UserManagementService {
         }
 
         user.withdraw();
+        oauthService.maskByUser(user);
         redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
         tokenBlacklistService.blacklistToken(accessToken);
     }

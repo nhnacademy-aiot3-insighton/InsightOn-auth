@@ -5,6 +5,12 @@ import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.exception.*;
+import com.nhnacademy.insightonauth.exception.auth.*;
+import com.nhnacademy.insightonauth.exception.user.*;
+import com.nhnacademy.insightonauth.exception.email.*;
+import com.nhnacademy.insightonauth.exception.signup.*;
+import com.nhnacademy.insightonauth.exception.oauth.*;
+import com.nhnacademy.insightonauth.exception.external.*;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.redis.ResendCounter;
@@ -81,10 +87,11 @@ public class UserEmailServiceImpl implements UserEmailService {
     public UserLoginResponse reactivateConfirm(String email, String code) {
         emailService.emailCodeVerify(email, code);
 
-        User user = userManagementService.findByEmail(email);
-        user.reactivate();
+        User user = userManagementService.findReactivatableByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
+        userManagementService.reactivate(user);
 
-        return tokenService.issueTokens(user, email);
+        return tokenService.issueTokens(user, user.getEmail());
     }
 
     @Override
@@ -96,7 +103,7 @@ public class UserEmailServiceImpl implements UserEmailService {
         }
 
         User user = userManagementService.findById(Long.valueOf(userIdStr));
-        user.reactivate();   // 상태를 ACTIVE로, 이메일 원복
+        userManagementService.reactivate(user);   // 상태를 ACTIVE로, 이메일/전화번호/연동 원복
 
         return tokenService.issueTokens(user, user.getEmail());
     }

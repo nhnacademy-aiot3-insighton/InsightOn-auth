@@ -25,4 +25,15 @@ class UserRoleTest {
         assertThat(userRole.getCreatedAt()).isNotNull();
     }
 
+    @Test
+    @DisplayName("모든 Role 값으로 userRole 생성 성공")
+    void createUserRole_withEachRole() {
+        for (Role role : Role.values()) {
+            UserRole userRole = new UserRole(user, role);
+            assertThat(userRole.getUser()).isEqualTo(user);
+            assertThat(userRole.getRole()).isEqualTo(role);
+            assertThat(userRole.getCreatedAt()).isNotNull();
+        }
+    }
+
 }

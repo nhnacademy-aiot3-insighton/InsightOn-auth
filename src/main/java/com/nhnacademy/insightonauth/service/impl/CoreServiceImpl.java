@@ -2,7 +2,7 @@ package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.client.CoreClient;
 import com.nhnacademy.insightonauth.dto.core.UserGroupResponse;
-import com.nhnacademy.insightonauth.exception.CoreServiceUnavailableException;
+import com.nhnacademy.insightonauth.exception.external.CoreServiceUnavailableException;
 import com.nhnacademy.insightonauth.service.CoreService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

@@ -3,7 +3,7 @@ package com.nhnacademy.insightonauth.handler;
 import com.nhnacademy.insightonauth.exception.BusinessException;
 import com.nhnacademy.insightonauth.exception.ErrorResponse;
 import com.nhnacademy.insightonauth.exception.OauthConflictResponse;
-import com.nhnacademy.insightonauth.exception.OauthLinkedToOtherAccountException;
+import com.nhnacademy.insightonauth.exception.oauth.OauthLinkedToOtherAccountException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

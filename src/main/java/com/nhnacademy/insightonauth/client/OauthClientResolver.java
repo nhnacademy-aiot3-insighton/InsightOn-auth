@@ -1,6 +1,6 @@
 package com.nhnacademy.insightonauth.client;
 
-import com.nhnacademy.insightonauth.exception.UnsupportedOAuthProviderException;
+import com.nhnacademy.insightonauth.exception.oauth.UnsupportedOAuthProviderException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

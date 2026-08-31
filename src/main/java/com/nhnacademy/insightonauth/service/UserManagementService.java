@@ -5,6 +5,7 @@ import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.User;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface UserManagementService {
     UserSignupResponse createUser(String email, String password, String userName,
@@ -15,6 +16,18 @@ public interface UserManagementService {
     User findById(Long userId);
 
     User findByEmail(String email);
+
+    /**
+     * 활성 계정을 email 로 찾고, 없으면 복구 기간 내 탈퇴 계정을 마스킹 접두어로 찾는다.
+     * 로그인/복구 진입점에서 사용.
+     */
+    Optional<User> findReactivatableByEmail(String email);
+
+    /**
+     * 탈퇴(또는 휴면) 계정을 ACTIVE 로 되돌린다.
+     * 탈퇴 계정은 원본 email/전화번호/연동 식별자가 재사용됐으면 {@link com.nhnacademy.insightonauth.exception.ReactivationConflictException}.
+     */
+    void reactivate(User user);
 
     void activate(Long userId);
 
