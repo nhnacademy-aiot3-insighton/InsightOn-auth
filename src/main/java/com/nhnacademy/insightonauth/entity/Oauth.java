@@ -12,7 +12,12 @@ import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "oauths", uniqueConstraints = {
-@UniqueConstraint(columnNames = {"provider", "provider_user_id"})   // 조합을 유니크로
+        @UniqueConstraint(
+                name = "uq_oauths_provider_provider_user_id",
+                columnNames = {"provider", "provider_user_id"}),
+        @UniqueConstraint(
+                name = "uq_oauth_user_provider",
+                columnNames = {"user_id", "provider"})
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
