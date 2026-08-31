@@ -213,7 +213,7 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("POST /oauth/{provider} — 200, 로그인 응답 반환")
+    @DisplayName("POST /oauth/{provider} — 200, accessToken 은 바디 / refreshToken 은 쿠키")
     void oauthLogin() throws Exception {
         when(userAuthenticationService.oauthLogin("google", "code-123"))
                 .thenReturn(UserLoginResult.success("acc", "ref"));
@@ -225,7 +225,28 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUCCESS"))
-                .andExpect(jsonPath("$.accessToken").value("acc"));
+                .andExpect(jsonPath("$.accessToken").value("acc"))
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(cookie().value("refreshToken", "ref"))
+                .andExpect(cookie().httpOnly("refreshToken", true));
+    }
+
+    @Test
+    @DisplayName("POST /oauth/{provider} — 탈퇴 복구 가능 계정은 200 PENDING_RESTORE + restoreToken")
+    void oauthLogin_pendingRestore() throws Exception {
+        when(userAuthenticationService.oauthLogin("google", "code-123"))
+                .thenReturn(UserLoginResult.pendingRestore("restore-tok"));
+
+        mvc.perform(post("/api/v1/auth/oauth/google")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "code": "code-123" }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_RESTORE"))
+                .andExpect(jsonPath("$.restoreToken").value("restore-tok"))
+                .andExpect(jsonPath("$.accessToken").isEmpty())
+                .andExpect(header().doesNotExist("Set-Cookie"));
     }
 
     @Test

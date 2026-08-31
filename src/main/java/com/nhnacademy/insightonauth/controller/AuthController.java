@@ -109,14 +109,21 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
-    // 소셜 로그인 (provider: google, github ...) — 연동 계정이 없으면 신규 가입 처리
+    // 소셜 로그인 (provider: google, github ...) — 연동 계정이 없으면 신규 가입 처리.
+    // 응답 규약은 일반 로그인과 동일 (access 토큰은 바디, refresh 토큰은 HttpOnly 쿠키).
     @PostMapping("/oauth/{provider}")
-    public ResponseEntity<UserLoginResult> oauthLogin(
+    public ResponseEntity<UserLoginResponse> oauthLogin(
             @PathVariable String provider,
             @RequestBody @Valid OauthLoginRequest request) {
 
-        UserLoginResult response = userAuthenticationService.oauthLogin(provider, request.code());
-        return ResponseEntity.ok(response);
+        UserLoginResult result = userAuthenticationService.oauthLogin(provider, request.code());
+
+        // 탈퇴 후 복구 가능 기간 내 계정 — 로그인 성공이 아니라 "복구 안내" 상태.
+        if ("PENDING_RESTORE".equals(result.status())) {
+            return ResponseEntity.ok(UserLoginResponse.pendingRestore(result.restoreToken()));
+        }
+
+        return loginResponder.success(result);
     }
 
     // refresh 토큰 쿠키로 새 access 토큰 재발급 (쿠키 없음/서명·만료 오류면 예외)
