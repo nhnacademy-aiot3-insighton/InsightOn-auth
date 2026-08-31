@@ -1,6 +1,6 @@
 package com.nhnacademy.insightonauth.service.impl;
 
-import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
@@ -84,7 +84,7 @@ public class UserEmailServiceImpl implements UserEmailService {
     }
 
     @Override
-    public UserLoginResponse reactivateConfirm(String email, String code) {
+    public UserLoginResult reactivateConfirm(String email, String code) {
         emailService.emailCodeVerify(email, code);
 
         User user = userManagementService.findReactivatableByEmail(email)
@@ -95,7 +95,7 @@ public class UserEmailServiceImpl implements UserEmailService {
     }
 
     @Override
-    public UserLoginResponse reactive(String reactiveToken) {
+    public UserLoginResult reactive(String reactiveToken) {
         // 바로 읽어서 있으면 삭제
         String userIdStr = redisService.getAndDelete(RedisKey.REACTIVE.getPrefix() + reactiveToken);
         if (userIdStr == null) {

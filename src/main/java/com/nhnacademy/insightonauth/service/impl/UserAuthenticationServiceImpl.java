@@ -3,7 +3,7 @@ package com.nhnacademy.insightonauth.service.impl;
 import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.client.OauthClientResolver;
 import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
-import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.entity.*;
 import com.nhnacademy.insightonauth.exception.*;
@@ -52,7 +52,7 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
     private final ResendCounter resendCounter;
 
     @Override
-    public UserLoginResponse login(String email, String password) {
+    public UserLoginResult login(String email, String password) {
         // 로그인 계정 lock 확인
         if (redisService.hasKey(RedisKey.LOGIN_LOCK.getPrefix() + email)) {
             throw new LoginTemporarilyLockedException("5회 연속 로그인 실패로 5분간 잠겼습니다.");
@@ -105,7 +105,7 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
     }
 
     @Override
-    public UserLoginResponse oauthLogin(String provider, String code) {
+    public UserLoginResult oauthLogin(String provider, String code) {
         OauthClient oauthClient = oauthClientResolver.resolve(provider);
         OauthUserInfo userInfo = oauthClient.getUserInfo(code);
 

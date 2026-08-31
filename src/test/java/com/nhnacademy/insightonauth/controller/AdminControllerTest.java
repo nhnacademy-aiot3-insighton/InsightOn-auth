@@ -2,7 +2,7 @@ package com.nhnacademy.insightonauth.controller;
 
 import com.nhnacademy.insightonauth.dto.admin.AdminFindUsersResponse;
 import com.nhnacademy.insightonauth.dto.admin.AdminUserDetailResponse;
-import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.handler.GlobalExceptionHandler;
@@ -37,6 +37,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -45,7 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(controllers = AdminController.class,
         excludeAutoConfiguration = {SecurityAutoConfiguration.class, SecurityFilterAutoConfiguration.class})
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, LoginResponder.class})
 class AdminControllerTest {
 
     @Autowired MockMvc mvc;
@@ -60,7 +61,7 @@ class AdminControllerTest {
     @DisplayName("POST /login — 관리자면 200, refreshToken 쿠키")
     void adminLogin() throws Exception {
         when(userAuthenticationService.login("admin@test.com", "Abcd1234!"))
-                .thenReturn(UserLoginResponse.success("admin-acc", "admin-ref"));
+                .thenReturn(UserLoginResult.success("admin-acc", "admin-ref"));
         when(jwtProvider.hasAdminRole("admin-acc")).thenReturn(true);
 
         mvc.perform(post("/api/v1/admin/login")
@@ -76,7 +77,7 @@ class AdminControllerTest {
     @DisplayName("POST /login — 탈퇴 복구 가능 관리자 계정은 200 PENDING_RESTORE (500 아님)")
     void adminLogin_pendingRestore() throws Exception {
         when(userAuthenticationService.login("admin@test.com", "Abcd1234!"))
-                .thenReturn(UserLoginResponse.pendingRestore("restore-tok"));
+                .thenReturn(UserLoginResult.pendingRestore("restore-tok"));
 
         mvc.perform(post("/api/v1/admin/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -86,7 +87,8 @@ class AdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING_RESTORE"))
                 .andExpect(jsonPath("$.restoreToken").value("restore-tok"))
-                .andExpect(jsonPath("$.accessToken").isEmpty());
+                .andExpect(jsonPath("$.accessToken").isEmpty())
+                .andExpect(header().doesNotExist("Set-Cookie"));
 
         verifyNoInteractions(jwtProvider);
     }
@@ -95,7 +97,7 @@ class AdminControllerTest {
     @DisplayName("POST /login — 일반 회원은 관리자 로그인 불가 401")
     void adminLogin_nonAdminRejected() throws Exception {
         when(userAuthenticationService.login(any(), any()))
-                .thenReturn(UserLoginResponse.success("member-acc", "r"));
+                .thenReturn(UserLoginResult.success("member-acc", "r"));
         when(jwtProvider.hasAdminRole("member-acc")).thenReturn(false);
 
         mvc.perform(post("/api/v1/admin/login")

@@ -3,7 +3,7 @@ package com.nhnacademy.insightonauth.service.impl;
 import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.client.OauthClientResolver;
 import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
-import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.entity.Oauth;
 import com.nhnacademy.insightonauth.entity.Status;
@@ -117,9 +117,9 @@ class UserAuthenticationServiceImplTest {
         when(credential.getPasswordHash()).thenReturn("hash");
         when(passwordEncoder.matches("pw", "hash")).thenReturn(true);
         when(tokenService.isWithinRestorePeriod(user)).thenReturn(true);
-        when(tokenService.handleWithdrawnLogin(user)).thenReturn(UserLoginResponse.pendingRestore("rt"));
+        when(tokenService.handleWithdrawnLogin(user)).thenReturn(UserLoginResult.pendingRestore("rt"));
 
-        UserLoginResponse result = authService.login("test@test.com", "pw");
+        UserLoginResult result = authService.login("test@test.com", "pw");
 
         assertThat(result.status()).isEqualTo("PENDING_RESTORE");
     }
@@ -162,9 +162,9 @@ class UserAuthenticationServiceImplTest {
         when(credential.getPasswordHash()).thenReturn("hash");
         when(passwordEncoder.matches("pw", "hash")).thenReturn(true);
         when(tokenService.issueTokens(user, "test@test.com"))
-                .thenReturn(UserLoginResponse.success("access", "refresh"));
+                .thenReturn(UserLoginResult.success("access", "refresh"));
 
-        UserLoginResponse result = authService.login("test@test.com", "pw");
+        UserLoginResult result = authService.login("test@test.com", "pw");
 
         assertThat(result.accessToken()).isEqualTo("access");
         assertThat(user.getLastLoginAt()).isNotNull();
@@ -184,9 +184,9 @@ class UserAuthenticationServiceImplTest {
         when(oauthService.findByProviderAndProviderUserId("google", "pid-1"))
                 .thenReturn(Optional.of(new Oauth(user, "google", "pid-1")));
         when(tokenService.issueTokens(user, "test@test.com"))
-                .thenReturn(UserLoginResponse.success("access", "refresh"));
+                .thenReturn(UserLoginResult.success("access", "refresh"));
 
-        UserLoginResponse result = authService.oauthLogin("google", "code");
+        UserLoginResult result = authService.oauthLogin("google", "code");
 
         assertThat(result.accessToken()).isEqualTo("access");
     }
@@ -200,7 +200,7 @@ class UserAuthenticationServiceImplTest {
         when(oauthService.findByProviderAndProviderUserId("google", "pid-1"))
                 .thenReturn(Optional.of(new Oauth(user, "google", "pid-1")));
         when(tokenService.isWithinRestorePeriod(user)).thenReturn(true);
-        when(tokenService.handleWithdrawnLogin(user)).thenReturn(UserLoginResponse.pendingRestore("rt"));
+        when(tokenService.handleWithdrawnLogin(user)).thenReturn(UserLoginResult.pendingRestore("rt"));
 
         assertThat(authService.oauthLogin("google", "code").status()).isEqualTo("PENDING_RESTORE");
     }
@@ -229,9 +229,9 @@ class UserAuthenticationServiceImplTest {
                 .thenReturn(Optional.empty());
         when(userRepository.existsByEmail("test@test.com")).thenReturn(false);
         when(tokenService.issueTokens(any(User.class), eq("test@test.com")))
-                .thenReturn(UserLoginResponse.success("access", "refresh"));
+                .thenReturn(UserLoginResult.success("access", "refresh"));
 
-        UserLoginResponse result = authService.oauthLogin("google", "code");
+        UserLoginResult result = authService.oauthLogin("google", "code");
 
         assertThat(result.accessToken()).isEqualTo("access");
         verify(userRepository).save(any(User.class));

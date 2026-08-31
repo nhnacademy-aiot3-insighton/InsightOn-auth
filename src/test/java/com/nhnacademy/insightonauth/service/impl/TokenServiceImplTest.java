@@ -1,6 +1,6 @@
 package com.nhnacademy.insightonauth.service.impl;
 
-import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserRole;
@@ -56,10 +56,10 @@ class TokenServiceImplTest {
         when(jwtProvider.createAccessToken(1L, List.of("MEMBER"), "test")).thenReturn("accessToken");
         when(jwtProvider.createRefreshToken(1L, List.of("MEMBER"))).thenReturn("refreshToken");
 
-        UserLoginResponse userLoginResponse = tokenService.issueTokens(user, user.getEmail());
+        UserLoginResult userLoginResult = tokenService.issueTokens(user, user.getEmail());
 
-        assertThat(userLoginResponse.accessToken()).isEqualTo("accessToken");
-        assertThat(userLoginResponse.refreshToken()).isEqualTo("refreshToken");
+        assertThat(userLoginResult.accessToken()).isEqualTo("accessToken");
+        assertThat(userLoginResult.refreshToken()).isEqualTo("refreshToken");
     }
 
     @Test
@@ -70,10 +70,10 @@ class TokenServiceImplTest {
         when(jwtProvider.createAccessToken(1L, List.of("ADMIN", "MEMBER"), "test")).thenReturn("accessToken");
         when(jwtProvider.createRefreshToken(1L, List.of("ADMIN", "MEMBER"))).thenReturn("refreshToken");
 
-        UserLoginResponse userLoginResponse = tokenService.issueTokens(user, user.getEmail());
+        UserLoginResult userLoginResult = tokenService.issueTokens(user, user.getEmail());
 
-        assertThat(userLoginResponse.accessToken()).isEqualTo("accessToken");
-        assertThat(userLoginResponse.refreshToken()).isEqualTo("refreshToken");
+        assertThat(userLoginResult.accessToken()).isEqualTo("accessToken");
+        assertThat(userLoginResult.refreshToken()).isEqualTo("refreshToken");
     }
 
     @Test
@@ -103,7 +103,7 @@ class TokenServiceImplTest {
     @Test
     @DisplayName("복구 토큰 발급 및 Redis 저장됨")
     void handleWithdrawnLogin() {
-        UserLoginResponse response = tokenService.handleWithdrawnLogin(user);
+        UserLoginResult response = tokenService.handleWithdrawnLogin(user);
 
         ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
         verify(redisService).set(keyCaptor.capture(), eq("1"), eq(Duration.ofMinutes(10)));

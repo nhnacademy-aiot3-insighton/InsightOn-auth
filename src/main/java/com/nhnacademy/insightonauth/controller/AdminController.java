@@ -4,9 +4,9 @@ package com.nhnacademy.insightonauth.controller;
 import com.nhnacademy.insightonauth.dto.admin.AdminFindUsersResponse;
 import com.nhnacademy.insightonauth.dto.admin.AdminUserDetailResponse;
 import com.nhnacademy.insightonauth.dto.admin.RoleChangeRequest;
-import com.nhnacademy.insightonauth.dto.auth.LoginResponse;
-import com.nhnacademy.insightonauth.dto.auth.UserLoginRequest;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginRequest;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.exception.auth.InvalidCredentialsException;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
@@ -17,12 +17,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Duration;
 import java.util.List;
 
 @RestController
@@ -34,37 +31,27 @@ public class AdminController {
     private final UserAuthenticationService userAuthenticationService;
     private final UserManagementService userManagementService;
     private final JwtProvider jwtProvider;
+    private final LoginResponder loginResponder;
 
+    // 관리자 로그인 — 응답 규약은 일반 로그인과 동일. 비관리자 계정은 이 경로로 로그인 불가
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> doLogin(
+    public ResponseEntity<UserLoginResponse> doLogin(
             @RequestBody @Valid UserLoginRequest userLoginRequest) {
-        UserLoginResponse userLoginResponse = userAuthenticationService.login(userLoginRequest.email(), userLoginRequest.password());
+        UserLoginResult result = userAuthenticationService.login(
+                userLoginRequest.email(), userLoginRequest.password());
 
         // 탈퇴 후 복구 가능 기간 내 관리자 계정 — 로그인 성공이 아니라 "복구 안내" 상태.
-        // accessToken 이 없으므로 admin 체크(hasAdminRole) 대상이 아니다.
-        if ("PENDING_RESTORE".equals(userLoginResponse.status())) {
-            return ResponseEntity.ok(LoginResponse.pendingRestore(userLoginResponse.restoreToken()));
+        // accessToken 이 없으므로 admin 체크 대상이 아니다.
+        if ("PENDING_RESTORE".equals(result.status())) {
+            return ResponseEntity.ok(UserLoginResponse.pendingRestore(result.restoreToken()));
         }
 
-        // 공통 검증기 사용 — 타입 안전, roles 없음/형식오류는 안전하게 false
-        if (!jwtProvider.hasAdminRole(userLoginResponse.accessToken())) {
+        if (!jwtProvider.hasAdminRole(result.accessToken())) {
             // 계정 열거 방지: 관리자 아님 / 비번 오류 / 없는 계정 모두 동일 메시지
             throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 
-        // 도커용
-        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", userLoginResponse.refreshToken())
-                .httpOnly(true)
-                .secure(true)           // https라 true
-                .path("/")
-                .sameSite("Lax")
-                .maxAge(Duration.ofDays(7))
-                .build();               // domain 안 박음
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())   // refresh 쿠키 헤더에 설정
-                .body(LoginResponse.success(userLoginResponse.accessToken()));
-
+        return loginResponder.success(result);
     }
 
     // 회원 목록 조회 (검색·페이징)

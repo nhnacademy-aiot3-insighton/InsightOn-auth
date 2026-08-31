@@ -1,6 +1,6 @@
 package com.nhnacademy.insightonauth.service.impl;
 
-import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
@@ -116,9 +116,9 @@ class UserEmailServiceImplTest {
     void reactivateConfirm_success() {
         when(userManagementService.findReactivatableByEmail("test@test.com")).thenReturn(Optional.of(user));
         when(tokenService.issueTokens(eq(user), anyString()))
-                .thenReturn(UserLoginResponse.success("access", "refresh"));
+                .thenReturn(UserLoginResult.success("access", "refresh"));
 
-        UserLoginResponse result = userEmailService.reactivateConfirm("test@test.com", "code");
+        UserLoginResult result = userEmailService.reactivateConfirm("test@test.com", "code");
 
         verify(userManagementService).reactivate(user);
         assertThat(result.accessToken()).isEqualTo("access");
@@ -141,9 +141,9 @@ class UserEmailServiceImplTest {
         when(redisService.getAndDelete(anyString())).thenReturn("1");
         when(userManagementService.findById(1L)).thenReturn(user);
         when(tokenService.issueTokens(eq(user), anyString()))
-                .thenReturn(UserLoginResponse.success("access", "refresh"));
+                .thenReturn(UserLoginResult.success("access", "refresh"));
 
-        UserLoginResponse result = userEmailService.reactive("rt");
+        UserLoginResult result = userEmailService.reactive("rt");
 
         verify(userManagementService).reactivate(user);
         assertThat(result.accessToken()).isEqualTo("access");

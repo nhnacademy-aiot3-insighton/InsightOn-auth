@@ -23,10 +23,10 @@ public class AccountController {
 
     // 재활성화 링크의 일회용 토큰으로 계정 즉시 복구 + 로그인 (탈퇴 안내 메일의 링크 클릭 경로)
     @PostMapping("/reactive")
-    public ResponseEntity<UserLoginResponse> userReactive(
+    public ResponseEntity<UserLoginResult> userReactive(
             @RequestBody @Valid ReactiveRequest request) {
 
-        UserLoginResponse response = userEmailService.reactive(request.reactiveToken());
+        UserLoginResult response = userEmailService.reactive(request.reactiveToken());
         return ResponseEntity.ok(response);
     }
 
@@ -39,12 +39,12 @@ public class AccountController {
 
     // 인증 코드 확인 후 탈퇴/휴면 계정을 ACTIVE로 복구 + 로그인
     @PostMapping("/reactivate/email-verify-confirm")
-    public ResponseEntity<UserLoginResponse> userReactiveConfirm(
+    public ResponseEntity<UserLoginResult> userReactiveConfirm(
             @RequestBody @Valid EmailVerifyConfirmRequest emailVerifyConfirmRequest) {
-        UserLoginResponse userLoginResponse =
+        UserLoginResult userLoginResult =
                 userEmailService.reactivateConfirm(emailVerifyConfirmRequest.email(), emailVerifyConfirmRequest.code());
 
-        return ResponseEntity.ok(userLoginResponse);
+        return ResponseEntity.ok(userLoginResult);
     }
 
     // 이름 + 전화번호로 가입 이메일 찾기 — 앞 2글자만 남기고 마스킹해서 반환
