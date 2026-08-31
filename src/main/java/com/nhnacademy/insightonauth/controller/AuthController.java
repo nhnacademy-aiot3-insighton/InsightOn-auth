@@ -14,13 +14,9 @@ import io.jsonwebtoken.JwtException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.Duration;
 
 /**
  * 정상 인증 흐름을 담당하는 컨트롤러.
@@ -39,6 +35,7 @@ public class AuthController {
     private final UserEmailService userEmailService;
     private final UserManagementService userManagementService;
     private final JwtProvider jwtProvider;
+    private final LoginResponder loginResponder;
 
     // 회원가입용 이메일 인증 코드 발송 요청 (재전송 쿨다운·횟수 제한 적용)
     @PostMapping("/email/verify-request")
@@ -83,33 +80,23 @@ public class AuthController {
 
     // 일반 회원 로그인 — access 토큰은 본문, refresh 토큰은 HttpOnly 쿠키. 관리자 계정은 이 경로로 로그인 불가
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> doLogin(
+    public ResponseEntity<UserLoginResponse> doLogin(
             @RequestBody @Valid UserLoginRequest userLoginRequest) {
-        UserLoginResponse userLoginResponse = userAuthenticationService.login(userLoginRequest.email(), userLoginRequest.password());
+        UserLoginResult result = userAuthenticationService.login(
+                userLoginRequest.email(), userLoginRequest.password());
 
         // 탈퇴 후 복구 가능 기간 내 계정 — 로그인 성공이 아니라 "복구 안내" 상태.
-        // accessToken 이 없으므로 admin 체크(hasAdminRole) 대상이 아니다.
-        if ("PENDING_RESTORE".equals(userLoginResponse.status())) {
-            return ResponseEntity.ok(LoginResponse.pendingRestore(userLoginResponse.restoreToken()));
+        // accessToken 이 없으므로 admin 체크 대상이 아니다.
+        if ("PENDING_RESTORE".equals(result.status())) {
+            return ResponseEntity.ok(UserLoginResponse.pendingRestore(result.restoreToken()));
         }
 
-        if (jwtProvider.hasAdminRole(userLoginResponse.accessToken())) {
-            // 계정 열거 방지: 관리자 아님 / 비번 오류 / 없는 계정 모두 동일 메시지
+        if (jwtProvider.hasAdminRole(result.accessToken())) {
+            // 계정 열거 방지: 관리자 / 비번 오류 / 없는 계정 모두 동일 메시지
             throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
-        // 도커용
-        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", userLoginResponse.refreshToken())
-                .httpOnly(true)
-                .secure(true)           // https라 true
-                .path("/")
-                .sameSite("Lax")
-                .maxAge(Duration.ofDays(7))
-                .build();               // domain 안 박음
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())   // refresh 쿠키 헤더에 설정
-                .body(LoginResponse.success(userLoginResponse.accessToken()));
-
+        return loginResponder.success(result);
     }
 
     // 로그아웃 — refresh 토큰 삭제 + 현재 access 토큰 블랙리스트 등록
@@ -122,14 +109,21 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
-    // 소셜 로그인 (provider: google, github ...) — 연동 계정이 없으면 신규 가입 처리
+    // 소셜 로그인 (provider: google, github ...) — 연동 계정이 없으면 신규 가입 처리.
+    // 응답 규약은 일반 로그인과 동일 (access 토큰은 바디, refresh 토큰은 HttpOnly 쿠키).
     @PostMapping("/oauth/{provider}")
     public ResponseEntity<UserLoginResponse> oauthLogin(
             @PathVariable String provider,
             @RequestBody @Valid OauthLoginRequest request) {
 
-        UserLoginResponse response = userAuthenticationService.oauthLogin(provider, request.code());
-        return ResponseEntity.ok(response);
+        UserLoginResult result = userAuthenticationService.oauthLogin(provider, request.code());
+
+        // 탈퇴 후 복구 가능 기간 내 계정 — 로그인 성공이 아니라 "복구 안내" 상태.
+        if ("PENDING_RESTORE".equals(result.status())) {
+            return ResponseEntity.ok(UserLoginResponse.pendingRestore(result.restoreToken()));
+        }
+
+        return loginResponder.success(result);
     }
 
     // refresh 토큰 쿠키로 새 access 토큰 재발급 (쿠키 없음/서명·만료 오류면 예외)

@@ -1,6 +1,6 @@
 package com.nhnacademy.insightonauth.controller;
 
-import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.handler.GlobalExceptionHandler;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
 import com.nhnacademy.insightonauth.service.UserEmailService;
@@ -43,7 +43,7 @@ class AccountControllerTest {
     @DisplayName("POST /reactive — 200, 복구 후 로그인 응답")
     void reactive() throws Exception {
         when(userEmailService.reactive("rt-123"))
-                .thenReturn(UserLoginResponse.success("acc", "ref"));
+                .thenReturn(UserLoginResult.success("acc", "ref"));
 
         mvc.perform(post("/api/v1/auth/reactive")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -82,7 +82,7 @@ class AccountControllerTest {
     @DisplayName("POST /reactivate/email-verify-confirm — 200, 복구 후 로그인 응답")
     void reactivateConfirm() throws Exception {
         when(userEmailService.reactivateConfirm("user@test.com", "123456"))
-                .thenReturn(UserLoginResponse.success("acc", "ref"));
+                .thenReturn(UserLoginResult.success("acc", "ref"));
 
         mvc.perform(post("/api/v1/auth/reactivate/email-verify-confirm")
                         .contentType(MediaType.APPLICATION_JSON)
