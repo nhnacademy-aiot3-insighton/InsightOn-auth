@@ -71,6 +71,11 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
             throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 
+        // 휴면이면 그냥 해제
+        if (user.getStatus() == Status.SLEEP) {
+            userManagementService.reactivate(user);
+        }
+
         if (user.getStatus() == Status.WITHDRAW) {
             if (tokenService.isWithinRestorePeriod(user)) {
                 return tokenService.handleWithdrawnLogin(user);
@@ -121,6 +126,11 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
                 // 복구 기간 만료 → 식별자를 비워 아래에서 새 계정으로 가입
                 oauthService.maskByUser(user);
             } else {
+                // 휴면이면 그냥 해제 (login() 과 동일)
+                if (user.getStatus() == Status.SLEEP) {
+                    userManagementService.reactivate(user);
+                }
+
                 if (!user.getStatus().isLoginable()) {
                     throw new InvalidUserException(user.getStatus().getMessage());
                 }
