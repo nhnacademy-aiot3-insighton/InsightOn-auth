@@ -18,24 +18,38 @@ import java.time.Duration;
 @Component
 public class LoginResponder {
 
-    /** refresh 쿠키 수명 = 토큰 유효기간(jwt.refresh-token-validity)과 동일하게 맞춘다. "15d" → Spring 이 Duration 으로 변환. */
+    /** 쿠키 수명 = 각 토큰 유효기간(jwt.*-token-validity)과 동일하게 맞춘다. "15d"/"15m" → Spring 이 Duration 으로 변환. */
+    private final Duration accessTokenValidity;
     private final Duration refreshTokenValidity;
 
-    LoginResponder(@Value("${jwt.refresh-token-validity}") Duration refreshTokenValidity) {
+    LoginResponder(@Value("${jwt.access-token-validity}") Duration accessTokenValidity,
+                   @Value("${jwt.refresh-token-validity}") Duration refreshTokenValidity) {
+        this.accessTokenValidity = accessTokenValidity;
         this.refreshTokenValidity = refreshTokenValidity;
     }
 
     ResponseEntity<UserLoginResponse> success(UserLoginResult result) {
-        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", result.refreshToken())
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie(result.refreshToken()).toString())
+                .body(UserLoginResponse.success(result.accessToken()));
+    }
+
+    /** 브라우저 주도 소셜 로그인은 바디를 못 주므로 access 토큰도 쿠키로 내려준다. */
+    ResponseCookie accessTokenCookie(String accessToken) {
+        return tokenCookie("accessToken", accessToken, accessTokenValidity);
+    }
+
+    ResponseCookie refreshTokenCookie(String refreshToken) {
+        return tokenCookie("refreshToken", refreshToken, refreshTokenValidity);
+    }
+
+    private ResponseCookie tokenCookie(String name, String value, Duration maxAge) {
+        return ResponseCookie.from(name, value)
                 .httpOnly(true)
                 .secure(true)           // https라 true
                 .path("/")
                 .sameSite("Lax")
-                .maxAge(refreshTokenValidity)
+                .maxAge(maxAge)
                 .build();               // domain 안 박음
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
-                .body(UserLoginResponse.success(result.accessToken()));
     }
 }

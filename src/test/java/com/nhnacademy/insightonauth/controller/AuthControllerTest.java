@@ -58,6 +58,7 @@ class AuthControllerTest {
     @MockitoBean UserManagementService userManagementService;
     @MockitoBean JwtProvider jwtProvider;
     @MockitoBean UserRoleService userRoleService; // HeaderAuthenticationFilter 의존성
+    @MockitoBean OauthWebSupport oauthWebSupport; // 브라우저 주도 OAuth 엔드포인트 의존성
 
     @Test
     @DisplayName("POST /email/verify-request — 204")
