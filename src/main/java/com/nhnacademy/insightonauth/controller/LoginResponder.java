@@ -21,11 +21,15 @@ public class LoginResponder {
     /** 쿠키 수명 = 각 토큰 유효기간(jwt.*-token-validity)과 동일하게 맞춘다. "15d"/"15m" → Spring 이 Duration 으로 변환. */
     private final Duration accessTokenValidity;
     private final Duration refreshTokenValidity;
+    /** dev(http)에서는 false. prod(https)는 true. 기본값 true 로 prod 안전. */
+    private final boolean cookieSecure;
 
     LoginResponder(@Value("${jwt.access-token-validity}") Duration accessTokenValidity,
-                   @Value("${jwt.refresh-token-validity}") Duration refreshTokenValidity) {
+                   @Value("${jwt.refresh-token-validity}") Duration refreshTokenValidity,
+                   @Value("${app.cookie.secure:true}") boolean cookieSecure) {
         this.accessTokenValidity = accessTokenValidity;
         this.refreshTokenValidity = refreshTokenValidity;
+        this.cookieSecure = cookieSecure;
     }
 
     ResponseEntity<UserLoginResponse> success(UserLoginResult result) {
@@ -46,7 +50,7 @@ public class LoginResponder {
     private ResponseCookie tokenCookie(String name, String value, Duration maxAge) {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
-                .secure(true)           // https라 true
+                .secure(cookieSecure)   // prod https=true, dev http=false
                 .path("/")
                 .sameSite("Lax")
                 .maxAge(maxAge)

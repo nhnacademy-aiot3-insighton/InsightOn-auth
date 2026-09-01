@@ -23,15 +23,19 @@ public class OauthWebSupport {
 
     private final String frontUrl;
     private final String redirectUri;
+    /** dev(http)에서는 false 로 내려야 브라우저가 state 쿠키를 콜백에 실어 보낸다. prod(https)는 true. */
+    private final boolean cookieSecure;
     private final Map<String, Provider> providers;
 
     OauthWebSupport(
             @Value("${app.front-url}") String frontUrl,
             @Value("${oauth.redirect-uri}") String redirectUri,
+            @Value("${app.cookie.secure:true}") boolean cookieSecure,
             @Value("${oauth.google.client-id}") String googleClientId,
             @Value("${oauth.github.client-id}") String githubClientId) {
         this.frontUrl = stripTrailingSlash(frontUrl);
         this.redirectUri = redirectUri;
+        this.cookieSecure = cookieSecure;
         this.providers = Map.of(
                 "google", new Provider(googleClientId,
                         "https://accounts.google.com/o/oauth2/v2/auth", "openid email profile"),
@@ -66,7 +70,7 @@ public class OauthWebSupport {
 
     private ResponseCookie.ResponseCookieBuilder baseStateCookie(String value) {
         return ResponseCookie.from(STATE_COOKIE, value)
-                .httpOnly(true).secure(true).path("/").sameSite("Lax");
+                .httpOnly(true).secure(cookieSecure).path("/").sameSite("Lax");
     }
 
     /** 프론트 절대 URL (예: {@code https://insighton.store/login?oauthError=1}). */
