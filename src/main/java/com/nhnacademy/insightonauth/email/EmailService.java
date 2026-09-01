@@ -47,8 +47,6 @@ public class EmailService {
         // Redis에 저장 (5분 TTL)
         redisService.set(RedisKey.VERIFY.getPrefix() + email, code, Duration.ofMinutes(5));
 
-        log.info("이메일 코드 발송: {}, {}", RedisKey.VERIFY.getPrefix() + email, code);
-
         // 메일 발송
         send(email, "[InsightOn] 이메일 인증 코드",
                 "인증 코드: " + code + "\n5분 이내에 입력해 주세요.");
@@ -84,8 +82,6 @@ public class EmailService {
 
         // Redis에 저장 (5분 TTL)
         redisService.set(RedisKey.REACTIVE.getPrefix() + email, code, Duration.ofMinutes(5));
-
-        log.info("이메일 코드 발송: {}, {}", RedisKey.REACTIVE.getPrefix() + email, code);
 
         // 메일 발송
         send(email, "[InsightOn] 이메일 인증 코드",
@@ -186,16 +182,13 @@ public class EmailService {
     }
 
     private void increaseVerifyFailCount(RedisKey failKey, RedisKey lockKey, String email) {
-        String saved = redisService.get(failKey.getPrefix() + email);
-        int failCount = (saved == null || saved.isBlank()) ? 0 : Integer.parseInt(saved);
-        failCount++;
+        // 원자적 INCR — 병렬 오입력이 같은 값을 읽고 덮어써 잠금을 건너뛰는 것을 막는다.
+        long failCount = redisService.increment(failKey.getPrefix() + email, Duration.ofMinutes(5));
 
         if (failCount >= 5) {
             redisService.delete(failKey.getPrefix() + email);
             redisService.set(lockKey.getPrefix() + email, "locked", Duration.ofMinutes(5));
             throw new VerificationTemporarilyLockedException("인증 시도가 5회 초과되어 5분간 잠겼습니다.");
-        } else {
-            redisService.set(failKey.getPrefix() + email, String.valueOf(failCount), Duration.ofMinutes(5));
         }
     }
 }
