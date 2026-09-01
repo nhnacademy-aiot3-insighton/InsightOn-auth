@@ -140,9 +140,9 @@ class UserAuthenticationServiceImplTest {
     }
 
     @Test
-    @DisplayName("login - 휴면 등 로그인 불가 상태면 InvalidUserException")
+    @DisplayName("login - 정지 등 로그인 불가 상태면 InvalidUserException")
     void login_notLoginable() {
-        user.setStatus(Status.SLEEP);
+        user.setStatus(Status.BLOCK);
         when(redisService.hasKey(anyString())).thenReturn(false);
         when(userManagementService.findReactivatableByEmail("test@test.com")).thenReturn(Optional.of(user));
         when(userCredentialService.findByUser(user)).thenReturn(credential);
@@ -151,6 +151,27 @@ class UserAuthenticationServiceImplTest {
 
         assertThatThrownBy(() -> authService.login("test@test.com", "pw"))
                 .isInstanceOf(InvalidUserException.class);
+    }
+
+    @Test
+    @DisplayName("login - 휴면 계정이면 자동 해제 후 그대로 로그인")
+    void login_sleepAutoReactivate() {
+        user.setStatus(Status.SLEEP);
+        when(redisService.hasKey(anyString())).thenReturn(false);
+        when(userManagementService.findReactivatableByEmail("test@test.com")).thenReturn(Optional.of(user));
+        when(userCredentialService.findByUser(user)).thenReturn(credential);
+        when(credential.getPasswordHash()).thenReturn("hash");
+        when(passwordEncoder.matches("pw", "hash")).thenReturn(true);
+        // reactivate 는 mock 이므로 실제 상태 전환을 흉내낸다 (안 그러면 아래 isLoginable 체크에 걸림)
+        doAnswer(inv -> { user.setStatus(Status.ACTIVE); return null; })
+                .when(userManagementService).reactivate(user);
+        when(tokenService.issueTokens(user, "test@test.com"))
+                .thenReturn(UserLoginResult.success("access", "refresh"));
+
+        UserLoginResult result = authService.login("test@test.com", "pw");
+
+        verify(userManagementService).reactivate(user);
+        assertThat(result.accessToken()).isEqualTo("access");
     }
 
     @Test
@@ -188,6 +209,25 @@ class UserAuthenticationServiceImplTest {
 
         UserLoginResult result = authService.oauthLogin("google", "code");
 
+        assertThat(result.accessToken()).isEqualTo("access");
+    }
+
+    @Test
+    @DisplayName("oauthLogin - 기존 연동이 휴면이면 자동 해제 후 그대로 로그인")
+    void oauthLogin_existingSleepAutoReactivate() {
+        user.setStatus(Status.SLEEP);
+        when(oauthClientResolver.resolve("google")).thenReturn(oauthClient);
+        when(oauthClient.getUserInfo("code")).thenReturn(userInfo());
+        when(oauthService.findByProviderAndProviderUserId("google", "pid-1"))
+                .thenReturn(Optional.of(new Oauth(user, "google", "pid-1")));
+        doAnswer(inv -> { user.setStatus(Status.ACTIVE); return null; })
+                .when(userManagementService).reactivate(user);
+        when(tokenService.issueTokens(user, "test@test.com"))
+                .thenReturn(UserLoginResult.success("access", "refresh"));
+
+        UserLoginResult result = authService.oauthLogin("google", "code");
+
+        verify(userManagementService).reactivate(user);
         assertThat(result.accessToken()).isEqualTo("access");
     }
 
