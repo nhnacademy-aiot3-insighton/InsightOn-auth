@@ -46,8 +46,23 @@ public enum RedisKey {
     // 비밀번호 재설정 메일 재전송 잠금 (email → "locked")
     PASSWORD_RESET_RESEND_LOCK("password-reset-resend-lock:"),
 
-    // 휴면 계정 복구 관련 (reactive)
+    // 재활성화 인증 코드 (email → 6자리 코드, 5분)
     REACTIVE("reactive:"),
+
+    // 재활성화 인증 코드 입력 실패 횟수 (email → count, 5분). 5회 초과 시 잠금
+    REACTIVE_VERIFY_FAIL("reactive-fail-count:"),
+
+    // 재활성화 인증 실패 잠금 (email → "locked", 5분). 존재 시 인증 시도 차단
+    REACTIVE_VERIFY_FAIL_LOCK("reactive-fail-lock:"),
+
+    // 재활성화 코드 재전송 연타 방지 쿨다운 (email, 예: 60초)
+    REACTIVE_RESEND_COOLDOWN("reactive-resend-cooldown:"),
+
+    // 재활성화 코드 재전송 누적 횟수 (email → count)
+    REACTIVE_RESEND_COUNT("reactive-resend-count:"),
+
+    // 재활성화 코드 재전송 잠금 (email → "locked")
+    REACTIVE_RESEND_LOCK("reactive-resend-lock:"),
 
     // 무효화된 액세스 토큰 블랙리스트 (로그아웃/차단 토큰)
     BLACKLIST("blacklist:"),

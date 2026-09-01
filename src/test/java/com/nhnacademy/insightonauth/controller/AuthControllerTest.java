@@ -167,10 +167,10 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("POST /login — 탈퇴 복구 가능 계정은 200 PENDING_RESTORE + restoreToken (500 아님)")
+    @DisplayName("POST /login — 탈퇴 복구 가능 계정은 200 PENDING_RESTORE (500 아님)")
     void login_pendingRestore() throws Exception {
         when(userAuthenticationService.login("gone@test.com", "Abcd1234!"))
-                .thenReturn(UserLoginResult.pendingRestore("restore-tok"));
+                .thenReturn(UserLoginResult.pendingRestore());
 
         mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -179,7 +179,7 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING_RESTORE"))
-                .andExpect(jsonPath("$.restoreToken").value("restore-tok"))
+                .andExpect(jsonPath("$.restoreToken").doesNotExist())
                 .andExpect(jsonPath("$.accessToken").isEmpty())
                 .andExpect(header().doesNotExist("Set-Cookie"));
 
@@ -232,10 +232,10 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("POST /oauth/{provider} — 탈퇴 복구 가능 계정은 200 PENDING_RESTORE + restoreToken")
+    @DisplayName("POST /oauth/{provider} — 탈퇴 복구 가능 계정은 200 PENDING_RESTORE")
     void oauthLogin_pendingRestore() throws Exception {
         when(userAuthenticationService.oauthLogin("google", "code-123"))
-                .thenReturn(UserLoginResult.pendingRestore("restore-tok"));
+                .thenReturn(UserLoginResult.pendingRestore());
 
         mvc.perform(post("/api/v1/auth/oauth/google")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -244,7 +244,7 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING_RESTORE"))
-                .andExpect(jsonPath("$.restoreToken").value("restore-tok"))
+                .andExpect(jsonPath("$.restoreToken").doesNotExist())
                 .andExpect(jsonPath("$.accessToken").isEmpty())
                 .andExpect(header().doesNotExist("Set-Cookie"));
     }

@@ -117,7 +117,6 @@ class UserAuthenticationServiceImplTest {
         when(credential.getPasswordHash()).thenReturn("hash");
         when(passwordEncoder.matches("pw", "hash")).thenReturn(true);
         when(tokenService.isWithinRestorePeriod(user)).thenReturn(true);
-        when(tokenService.handleWithdrawnLogin(user)).thenReturn(UserLoginResult.pendingRestore("rt"));
 
         UserLoginResult result = authService.login("test@test.com", "pw");
 
@@ -240,7 +239,6 @@ class UserAuthenticationServiceImplTest {
         when(oauthService.findByProviderAndProviderUserId("google", "pid-1"))
                 .thenReturn(Optional.of(new Oauth(user, "google", "pid-1")));
         when(tokenService.isWithinRestorePeriod(user)).thenReturn(true);
-        when(tokenService.handleWithdrawnLogin(user)).thenReturn(UserLoginResult.pendingRestore("rt"));
 
         assertThat(authService.oauthLogin("google", "code").status()).isEqualTo("PENDING_RESTORE");
     }

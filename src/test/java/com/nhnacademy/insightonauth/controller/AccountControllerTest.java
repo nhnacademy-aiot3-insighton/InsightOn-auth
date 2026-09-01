@@ -21,6 +21,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -29,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(controllers = AccountController.class,
         excludeAutoConfiguration = {SecurityAutoConfiguration.class, SecurityFilterAutoConfiguration.class})
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, LoginResponder.class})
 class AccountControllerTest {
 
     @Autowired MockMvc mvc;
@@ -38,32 +39,6 @@ class AccountControllerTest {
     @MockitoBean UserManagementService userManagementService;
     @MockitoBean UserAuthenticationService userAuthenticationService; // HeaderAuthenticationFilter 의존성
     @MockitoBean UserRoleService userRoleService;                     // HeaderAuthenticationFilter 의존성
-
-    @Test
-    @DisplayName("POST /reactive — 200, 복구 후 로그인 응답")
-    void reactive() throws Exception {
-        when(userEmailService.reactive("rt-123"))
-                .thenReturn(UserLoginResult.success("acc", "ref"));
-
-        mvc.perform(post("/api/v1/auth/reactive")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                { "reactiveToken": "rt-123" }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("SUCCESS"));
-    }
-
-    @Test
-    @DisplayName("POST /reactive — 토큰 누락 400")
-    void reactive_validation() throws Exception {
-        mvc.perform(post("/api/v1/auth/reactive")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                { "reactiveToken": "" }
-                                """))
-                .andExpect(status().isBadRequest());
-    }
 
     @Test
     @DisplayName("POST /reactivate/email-verify-request — 204")
@@ -79,7 +54,7 @@ class AccountControllerTest {
     }
 
     @Test
-    @DisplayName("POST /reactivate/email-verify-confirm — 200, 복구 후 로그인 응답")
+    @DisplayName("POST /reactivate/email-verify-confirm — 200, accessToken 은 바디 / refreshToken 은 쿠키")
     void reactivateConfirm() throws Exception {
         when(userEmailService.reactivateConfirm("user@test.com", "123456"))
                 .thenReturn(UserLoginResult.success("acc", "ref"));
@@ -90,7 +65,11 @@ class AccountControllerTest {
                                 { "email": "user@test.com", "code": "123456" }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("SUCCESS"));
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.accessToken").value("acc"))
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(cookie().value("refreshToken", "ref"))
+                .andExpect(cookie().httpOnly("refreshToken", true));
     }
 
     @Test
