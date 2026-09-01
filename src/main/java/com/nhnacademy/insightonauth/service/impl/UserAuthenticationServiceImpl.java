@@ -3,7 +3,7 @@ package com.nhnacademy.insightonauth.service.impl;
 import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.client.OauthClientResolver;
 import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
-import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.entity.*;
 import com.nhnacademy.insightonauth.exception.*;
@@ -52,7 +52,7 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
     private final ResendCounter resendCounter;
 
     @Override
-    public UserLoginResponse login(String email, String password) {
+    public UserLoginResult login(String email, String password) {
         // 로그인 계정 lock 확인
         if (redisService.hasKey(RedisKey.LOGIN_LOCK.getPrefix() + email)) {
             throw new LoginTemporarilyLockedException("5회 연속 로그인 실패로 5분간 잠겼습니다.");
@@ -71,9 +71,14 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
             throw new InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 
+        // 휴면이면 그냥 해제
+        if (user.getStatus() == Status.SLEEP) {
+            userManagementService.reactivate(user);
+        }
+
         if (user.getStatus() == Status.WITHDRAW) {
             if (tokenService.isWithinRestorePeriod(user)) {
-                return tokenService.handleWithdrawnLogin(user);
+                return UserLoginResult.pendingRestore();
             }
             throw new RestorePeriodExpiredException("탈퇴 복구 가능 기간(7일)이 지났습니다.");
         }
@@ -105,7 +110,7 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
     }
 
     @Override
-    public UserLoginResponse oauthLogin(String provider, String code) {
+    public UserLoginResult oauthLogin(String provider, String code) {
         OauthClient oauthClient = oauthClientResolver.resolve(provider);
         OauthUserInfo userInfo = oauthClient.getUserInfo(code);
 
@@ -116,11 +121,16 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
             // 탈퇴 상태 체크 (마스킹 전 레거시 연동 행)
             if (user.getStatus() == Status.WITHDRAW) {
                 if (tokenService.isWithinRestorePeriod(user)) {
-                    return tokenService.handleWithdrawnLogin(user);
+                    return UserLoginResult.pendingRestore();
                 }
                 // 복구 기간 만료 → 식별자를 비워 아래에서 새 계정으로 가입
                 oauthService.maskByUser(user);
             } else {
+                // 휴면이면 그냥 해제 (login() 과 동일)
+                if (user.getStatus() == Status.SLEEP) {
+                    userManagementService.reactivate(user);
+                }
+
                 if (!user.getStatus().isLoginable()) {
                     throw new InvalidUserException(user.getStatus().getMessage());
                 }
@@ -134,7 +144,7 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
                     oauthService.findReactivatableByProviderAndProviderUserId(provider, userInfo.providerId());
             if (withdrawnOauth.isPresent()
                     && tokenService.isWithinRestorePeriod(withdrawnOauth.get().getUser())) {
-                return tokenService.handleWithdrawnLogin(withdrawnOauth.get().getUser());
+                return UserLoginResult.pendingRestore();
             }
             // 만료됐거나 연동 없음 → 아래에서 새 계정으로 가입
         }

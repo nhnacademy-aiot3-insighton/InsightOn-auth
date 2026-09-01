@@ -1,6 +1,6 @@
 package com.nhnacademy.insightonauth.service;
 
-import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 
 public interface UserEmailService {
 
@@ -8,8 +8,7 @@ public interface UserEmailService {
     String emailVerifyConfirm(String email, String code);
 
     void reactivateRequest(String email);
-    UserLoginResponse reactivateConfirm(String email, String code);
-    UserLoginResponse reactive(String reactiveToken);
+    UserLoginResult reactivateConfirm(String email, String code);
 
     void passwordResetRequest(String email);
     void passwordResetConfirm(String token, String newPassword);

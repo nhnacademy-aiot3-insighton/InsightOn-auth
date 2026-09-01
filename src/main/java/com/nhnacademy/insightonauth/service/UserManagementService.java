@@ -23,10 +23,6 @@ public interface UserManagementService {
      */
     Optional<User> findReactivatableByEmail(String email);
 
-    /**
-     * 탈퇴(또는 휴면) 계정을 ACTIVE 로 되돌린다.
-     * 탈퇴 계정은 원본 email/전화번호/연동 식별자가 재사용됐으면 {@link com.nhnacademy.insightonauth.exception.ReactivationConflictException}.
-     */
     void reactivate(User user);
 
     void activate(Long userId);

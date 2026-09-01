@@ -1,31 +1,26 @@
 package com.nhnacademy.insightonauth.service.impl;
 
-import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserRole;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
-import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.service.UserRoleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,10 +51,10 @@ class TokenServiceImplTest {
         when(jwtProvider.createAccessToken(1L, List.of("MEMBER"), "test")).thenReturn("accessToken");
         when(jwtProvider.createRefreshToken(1L, List.of("MEMBER"))).thenReturn("refreshToken");
 
-        UserLoginResponse userLoginResponse = tokenService.issueTokens(user, user.getEmail());
+        UserLoginResult userLoginResult = tokenService.issueTokens(user, user.getEmail());
 
-        assertThat(userLoginResponse.accessToken()).isEqualTo("accessToken");
-        assertThat(userLoginResponse.refreshToken()).isEqualTo("refreshToken");
+        assertThat(userLoginResult.accessToken()).isEqualTo("accessToken");
+        assertThat(userLoginResult.refreshToken()).isEqualTo("refreshToken");
     }
 
     @Test
@@ -70,10 +65,10 @@ class TokenServiceImplTest {
         when(jwtProvider.createAccessToken(1L, List.of("ADMIN", "MEMBER"), "test")).thenReturn("accessToken");
         when(jwtProvider.createRefreshToken(1L, List.of("ADMIN", "MEMBER"))).thenReturn("refreshToken");
 
-        UserLoginResponse userLoginResponse = tokenService.issueTokens(user, user.getEmail());
+        UserLoginResult userLoginResult = tokenService.issueTokens(user, user.getEmail());
 
-        assertThat(userLoginResponse.accessToken()).isEqualTo("accessToken");
-        assertThat(userLoginResponse.refreshToken()).isEqualTo("refreshToken");
+        assertThat(userLoginResult.accessToken()).isEqualTo("accessToken");
+        assertThat(userLoginResult.refreshToken()).isEqualTo("refreshToken");
     }
 
     @Test
@@ -98,17 +93,5 @@ class TokenServiceImplTest {
         ReflectionTestUtils.setField(user, "withdrawnAt", null);
 
         assertThat(tokenService.isWithinRestorePeriod(user)).isFalse();
-    }
-
-    @Test
-    @DisplayName("복구 토큰 발급 및 Redis 저장됨")
-    void handleWithdrawnLogin() {
-        UserLoginResponse response = tokenService.handleWithdrawnLogin(user);
-
-        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
-        verify(redisService).set(keyCaptor.capture(), eq("1"), eq(Duration.ofMinutes(10)));
-
-        assertThat(keyCaptor.getValue())
-                .isEqualTo(RedisKey.REACTIVE.getPrefix() + response.restoreToken());
     }
 }

@@ -1,6 +1,6 @@
 package com.nhnacademy.insightonauth.service.impl;
 
-import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
@@ -80,30 +80,44 @@ public class UserEmailServiceImpl implements UserEmailService {
 
     @Override
     public void reactivateRequest(String email) {
-        emailService.sendVerificationCode(email);
+        // 1. 잠금 체크 — 계정 여부와 무관하게 항상
+        if (redisService.hasKey(RedisKey.REACTIVE_RESEND_LOCK.getPrefix() + email)) {
+            throw new VerificationResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+        }
+
+        // 2. 연타 방지 — 원자적 setIfAbsent로 체크와 설정을 한 번에
+        boolean acquired = redisService.setIfAbsent(
+                RedisKey.REACTIVE_RESEND_COOLDOWN.getPrefix() + email,
+                "1",
+                Duration.ofSeconds(60)
+        );
+        if (!acquired) {
+            throw new VerificationResendTooSoonException("잠시 후 다시 시도해 주세요.");
+        }
+
+        // 3. 카운터 증가 — 이번 요청으로 임계치에 도달해 잠겼으면 발송하지 않고 예외
+        boolean lockedNow = resendCounter.increase(
+                RedisKey.REACTIVE_RESEND_COUNT.getPrefix() + email,
+                RedisKey.REACTIVE_RESEND_LOCK.getPrefix() + email,
+                5,
+                Duration.ofMinutes(15)
+        );
+        if (lockedNow) {
+            throw new VerificationResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+        }
+
+        // 4. 실제 메일 발송은 복구 가능한 계정일 때만 (없어도 예외 안 던짐 — 계정 존재 노출 방지)
+        userManagementService.findReactivatableByEmail(email)
+                .ifPresent(user -> emailService.sendReactiveVerificationCode(email));
     }
 
     @Override
-    public UserLoginResponse reactivateConfirm(String email, String code) {
-        emailService.emailCodeVerify(email, code);
+    public UserLoginResult reactivateConfirm(String email, String code) {
+        emailService.emailReactiveVerifyCheck(email, code);
 
         User user = userManagementService.findReactivatableByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
-        userManagementService.reactivate(user);
-
-        return tokenService.issueTokens(user, user.getEmail());
-    }
-
-    @Override
-    public UserLoginResponse reactive(String reactiveToken) {
-        // 바로 읽어서 있으면 삭제
-        String userIdStr = redisService.getAndDelete(RedisKey.REACTIVE.getPrefix() + reactiveToken);
-        if (userIdStr == null) {
-            throw new InvalidReactiveTokenException("복구 요청이 유효하지 않거나 만료되었습니다.");
-        }
-
-        User user = userManagementService.findById(Long.valueOf(userIdStr));
-        userManagementService.reactivate(user);   // 상태를 ACTIVE로, 이메일/전화번호/연동 원복
+        userManagementService.reactivate(user); // 상태를 ACTIVE로, 이메일/전화번호/연동 원복
 
         return tokenService.issueTokens(user, user.getEmail());
     }

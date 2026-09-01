@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
 import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
 import com.nhnacademy.insightonauth.entity.Role;
@@ -47,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(controllers = AuthController.class,
         excludeAutoConfiguration = {SecurityAutoConfiguration.class, SecurityFilterAutoConfiguration.class})
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, LoginResponder.class})
 class AuthControllerTest {
 
     @Autowired MockMvc mvc;
@@ -58,6 +58,7 @@ class AuthControllerTest {
     @MockitoBean UserManagementService userManagementService;
     @MockitoBean JwtProvider jwtProvider;
     @MockitoBean UserRoleService userRoleService; // HeaderAuthenticationFilter 의존성
+    @MockitoBean OauthWebSupport oauthWebSupport; // 브라우저 주도 OAuth 엔드포인트 의존성
 
     @Test
     @DisplayName("POST /email/verify-request — 204")
@@ -150,7 +151,7 @@ class AuthControllerTest {
     @DisplayName("POST /login — 200, status=SUCCESS + accessToken, refreshToken 쿠키")
     void login() throws Exception {
         when(userAuthenticationService.login("user@test.com", "Abcd1234!"))
-                .thenReturn(UserLoginResponse.success("access-xyz", "refresh-abc"));
+                .thenReturn(UserLoginResult.success("access-xyz", "refresh-abc"));
         when(jwtProvider.hasAdminRole("access-xyz")).thenReturn(false);
 
         mvc.perform(post("/api/v1/auth/login")
@@ -167,10 +168,10 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("POST /login — 탈퇴 복구 가능 계정은 200 PENDING_RESTORE + restoreToken (500 아님)")
+    @DisplayName("POST /login — 탈퇴 복구 가능 계정은 200 PENDING_RESTORE (500 아님)")
     void login_pendingRestore() throws Exception {
         when(userAuthenticationService.login("gone@test.com", "Abcd1234!"))
-                .thenReturn(UserLoginResponse.pendingRestore("restore-tok"));
+                .thenReturn(UserLoginResult.pendingRestore());
 
         mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -179,7 +180,7 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING_RESTORE"))
-                .andExpect(jsonPath("$.restoreToken").value("restore-tok"))
+                .andExpect(jsonPath("$.restoreToken").doesNotExist())
                 .andExpect(jsonPath("$.accessToken").isEmpty())
                 .andExpect(header().doesNotExist("Set-Cookie"));
 
@@ -190,7 +191,7 @@ class AuthControllerTest {
     @DisplayName("POST /login — 관리자 계정은 일반 로그인 불가 401")
     void login_adminRejected() throws Exception {
         when(userAuthenticationService.login(any(), any()))
-                .thenReturn(UserLoginResponse.success("admin-token", "r"));
+                .thenReturn(UserLoginResult.success("admin-token", "r"));
         when(jwtProvider.hasAdminRole("admin-token")).thenReturn(true);
 
         mvc.perform(post("/api/v1/auth/login")
@@ -213,10 +214,10 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("POST /oauth/{provider} — 200, 로그인 응답 반환")
+    @DisplayName("POST /oauth/{provider} — 200, accessToken 은 바디 / refreshToken 은 쿠키")
     void oauthLogin() throws Exception {
         when(userAuthenticationService.oauthLogin("google", "code-123"))
-                .thenReturn(UserLoginResponse.success("acc", "ref"));
+                .thenReturn(UserLoginResult.success("acc", "ref"));
 
         mvc.perform(post("/api/v1/auth/oauth/google")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -225,7 +226,28 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUCCESS"))
-                .andExpect(jsonPath("$.accessToken").value("acc"));
+                .andExpect(jsonPath("$.accessToken").value("acc"))
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(cookie().value("refreshToken", "ref"))
+                .andExpect(cookie().httpOnly("refreshToken", true));
+    }
+
+    @Test
+    @DisplayName("POST /oauth/{provider} — 탈퇴 복구 가능 계정은 200 PENDING_RESTORE")
+    void oauthLogin_pendingRestore() throws Exception {
+        when(userAuthenticationService.oauthLogin("google", "code-123"))
+                .thenReturn(UserLoginResult.pendingRestore());
+
+        mvc.perform(post("/api/v1/auth/oauth/google")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "code": "code-123" }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_RESTORE"))
+                .andExpect(jsonPath("$.restoreToken").doesNotExist())
+                .andExpect(jsonPath("$.accessToken").isEmpty())
+                .andExpect(header().doesNotExist("Set-Cookie"));
     }
 
     @Test
