@@ -99,6 +99,45 @@ class UserEmailServiceImplTest {
         verify(emailService).sendVerificationCode("test@test.com");
     }
 
+    // ---------- reactivateRequest ----------
+
+    @Test
+    @DisplayName("reactivateRequest - 쿨다운이면 예외")
+    void reactivateRequest_cooldown() {
+        when(redisService.hasKey(anyString())).thenReturn(false);
+        when(redisService.setIfAbsent(contains("reactive-resend-cooldown"), anyString(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> userEmailService.reactivateRequest("test@test.com"))
+                .isInstanceOf(VerificationResendTooSoonException.class);
+        verify(emailService, never()).sendReactiveVerificationCode(anyString());
+    }
+
+    @Test
+    @DisplayName("reactivateRequest - 복구 가능한 계정이 없어도 예외 없이 종료 (메일만 미발송)")
+    void reactivateRequest_noAccount() {
+        when(redisService.hasKey(anyString())).thenReturn(false);
+        when(redisService.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
+        when(resendCounter.increase(anyString(), anyString(), anyInt(), any())).thenReturn(false);
+        when(userManagementService.findReactivatableByEmail("test@test.com")).thenReturn(Optional.empty());
+
+        userEmailService.reactivateRequest("test@test.com");
+
+        verify(emailService, never()).sendReactiveVerificationCode(anyString());
+    }
+
+    @Test
+    @DisplayName("reactivateRequest - 복구 가능한 계정이면 재활성화 코드 발송")
+    void reactivateRequest_success() {
+        when(redisService.hasKey(anyString())).thenReturn(false);
+        when(redisService.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
+        when(resendCounter.increase(anyString(), anyString(), anyInt(), any())).thenReturn(false);
+        when(userManagementService.findReactivatableByEmail("test@test.com")).thenReturn(Optional.of(user));
+
+        userEmailService.reactivateRequest("test@test.com");
+
+        verify(emailService).sendReactiveVerificationCode("test@test.com");
+    }
+
     // ---------- reactivateConfirm ----------
 
     @Test
@@ -108,7 +147,7 @@ class UserEmailServiceImplTest {
 
         assertThatThrownBy(() -> userEmailService.reactivateConfirm("test@test.com", "code"))
                 .isInstanceOf(UserNotFoundException.class);
-        verify(emailService).emailCodeVerify("test@test.com", "code");
+        verify(emailService).emailReactiveVerifyCheck("test@test.com", "code");
     }
 
     @Test
@@ -119,31 +158,6 @@ class UserEmailServiceImplTest {
                 .thenReturn(UserLoginResult.success("access", "refresh"));
 
         UserLoginResult result = userEmailService.reactivateConfirm("test@test.com", "code");
-
-        verify(userManagementService).reactivate(user);
-        assertThat(result.accessToken()).isEqualTo("access");
-    }
-
-    // ---------- reactive (token) ----------
-
-    @Test
-    @DisplayName("reactive - 토큰이 없으면 예외")
-    void reactive_invalidToken() {
-        when(redisService.getAndDelete(contains("reactive"))).thenReturn(null);
-
-        assertThatThrownBy(() -> userEmailService.reactive("rt"))
-                .isInstanceOf(InvalidReactiveTokenException.class);
-    }
-
-    @Test
-    @DisplayName("reactive - 토큰이 있으면 해당 유저 재활성화 + 토큰 발급")
-    void reactive_success() {
-        when(redisService.getAndDelete(anyString())).thenReturn("1");
-        when(userManagementService.findById(1L)).thenReturn(user);
-        when(tokenService.issueTokens(eq(user), anyString()))
-                .thenReturn(UserLoginResult.success("access", "refresh"));
-
-        UserLoginResult result = userEmailService.reactive("rt");
 
         verify(userManagementService).reactivate(user);
         assertThat(result.accessToken()).isEqualTo("access");

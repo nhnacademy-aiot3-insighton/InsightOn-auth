@@ -88,7 +88,7 @@ public class AuthController {
         // 탈퇴 후 복구 가능 기간 내 계정 — 로그인 성공이 아니라 "복구 안내" 상태.
         // accessToken 이 없으므로 admin 체크 대상이 아니다.
         if ("PENDING_RESTORE".equals(result.status())) {
-            return ResponseEntity.ok(UserLoginResponse.pendingRestore(result.restoreToken()));
+            return ResponseEntity.ok(UserLoginResponse.pendingRestore());
         }
 
         if (jwtProvider.hasAdminRole(result.accessToken())) {
@@ -120,7 +120,7 @@ public class AuthController {
 
         // 탈퇴 후 복구 가능 기간 내 계정 — 로그인 성공이 아니라 "복구 안내" 상태.
         if ("PENDING_RESTORE".equals(result.status())) {
-            return ResponseEntity.ok(UserLoginResponse.pendingRestore(result.restoreToken()));
+            return ResponseEntity.ok(UserLoginResponse.pendingRestore());
         }
 
         return loginResponder.success(result);

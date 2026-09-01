@@ -14,10 +14,4 @@ public interface TokenService {
      * 탈퇴 후 7일 이내(복구 가능 기간)인지 확인한다.
      */
     boolean isWithinRestorePeriod(User user);
-
-    /**
-     * 탈퇴 복구 가능 기간 내 로그인 시, 복구용 토큰을 발급해
-     * 즉시 로그인 대신 복구 확인 절차로 안내한다.
-     */
-    UserLoginResult handleWithdrawnLogin(User user);
 }

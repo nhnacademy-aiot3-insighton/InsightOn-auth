@@ -11,11 +11,9 @@ import com.nhnacademy.insightonauth.service.UserRoleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -48,14 +46,5 @@ public class TokenServiceImpl implements TokenService {
         }
         OffsetDateTime deadline = withdrawnAt.plusDays(7);
         return OffsetDateTime.now(ZoneOffset.UTC).isBefore(deadline);
-    }
-
-    @Override
-    public UserLoginResult handleWithdrawnLogin(User user) {
-        String restoreToken = UUID.randomUUID().toString();
-        redisService.set(RedisKey.REACTIVE.getPrefix() + restoreToken,
-                user.getUserId().toString(), Duration.ofMinutes(10));
-
-        return UserLoginResult.pendingRestore(restoreToken);
     }
 }

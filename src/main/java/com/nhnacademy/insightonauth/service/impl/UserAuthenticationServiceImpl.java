@@ -78,7 +78,7 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
 
         if (user.getStatus() == Status.WITHDRAW) {
             if (tokenService.isWithinRestorePeriod(user)) {
-                return tokenService.handleWithdrawnLogin(user);
+                return UserLoginResult.pendingRestore();
             }
             throw new RestorePeriodExpiredException("탈퇴 복구 가능 기간(7일)이 지났습니다.");
         }
@@ -121,7 +121,7 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
             // 탈퇴 상태 체크 (마스킹 전 레거시 연동 행)
             if (user.getStatus() == Status.WITHDRAW) {
                 if (tokenService.isWithinRestorePeriod(user)) {
-                    return tokenService.handleWithdrawnLogin(user);
+                    return UserLoginResult.pendingRestore();
                 }
                 // 복구 기간 만료 → 식별자를 비워 아래에서 새 계정으로 가입
                 oauthService.maskByUser(user);
@@ -144,7 +144,7 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
                     oauthService.findReactivatableByProviderAndProviderUserId(provider, userInfo.providerId());
             if (withdrawnOauth.isPresent()
                     && tokenService.isWithinRestorePeriod(withdrawnOauth.get().getUser())) {
-                return tokenService.handleWithdrawnLogin(withdrawnOauth.get().getUser());
+                return UserLoginResult.pendingRestore();
             }
             // 만료됐거나 연동 없음 → 아래에서 새 계정으로 가입
         }

@@ -77,7 +77,7 @@ class AdminControllerTest {
     @DisplayName("POST /login — 탈퇴 복구 가능 관리자 계정은 200 PENDING_RESTORE (500 아님)")
     void adminLogin_pendingRestore() throws Exception {
         when(userAuthenticationService.login("admin@test.com", "Abcd1234!"))
-                .thenReturn(UserLoginResult.pendingRestore("restore-tok"));
+                .thenReturn(UserLoginResult.pendingRestore());
 
         mvc.perform(post("/api/v1/admin/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -86,7 +86,7 @@ class AdminControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING_RESTORE"))
-                .andExpect(jsonPath("$.restoreToken").value("restore-tok"))
+                .andExpect(jsonPath("$.restoreToken").doesNotExist())
                 .andExpect(jsonPath("$.accessToken").isEmpty())
                 .andExpect(header().doesNotExist("Set-Cookie"));
 
