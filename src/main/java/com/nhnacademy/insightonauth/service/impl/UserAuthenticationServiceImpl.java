@@ -105,7 +105,8 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
 
     @Override
     public void forceLogout(Long userId) {
-        // 강제 로그아웃의 경우 access를 짧게 주었기 때문에 리프레시 삭제만으로 일단 결정
+        // 현재 access 토큰 무효화 + refresh 삭제. 재로그인은 가능(status 는 그대로).
+        tokenBlacklistService.blacklistByUserId(userId);
         redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
     }
 

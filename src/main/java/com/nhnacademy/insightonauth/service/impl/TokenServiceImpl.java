@@ -30,6 +30,14 @@ public class TokenServiceImpl implements TokenService {
                 .map(userRole -> userRole.getRole().name())
                 .toList();
 
+        // 동시 로그인 차단(last-wins): 이전 세션의 access 토큰을 블랙리스트에 올린다.
+        // createRefreshToken 이 refresh:{userId} 를 덮어쓰는 것과 짝이 맞아,
+        // 다른 기기 세션은 다음 요청에서 401 → 이후 refresh 실패로 완전 로그아웃된다.
+        String prevJti = redisService.get(RedisKey.ACCESS_JTI.getPrefix() + user.getUserId());
+        if (prevJti != null) {
+            redisService.set(RedisKey.BLACKLIST.getPrefix() + prevJti, "1", jwtProvider.getAccessValidity());
+        }
+
         String accessToken = jwtProvider.createAccessToken(user.getUserId(), roles, user.getUserName());
         String refreshToken = jwtProvider.createRefreshToken(user.getUserId(), roles);
 

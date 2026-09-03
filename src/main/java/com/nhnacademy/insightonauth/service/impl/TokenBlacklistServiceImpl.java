@@ -48,4 +48,16 @@ public class TokenBlacklistServiceImpl implements TokenBlacklistService {
             log.warn("유효하지 않은 토큰으로 블랙리스트 등록 시도: {}", e.getMessage());
         }
     }
+
+    @Override
+    public void blacklistByUserId(Long userId) {
+        String jti = redisService.get(RedisKey.ACCESS_JTI.getPrefix() + userId);
+        if (jti == null) {
+            // 활성 세션이 없음 (미로그인/이미 만료) — 할 일 없음
+            return;
+        }
+        // 정확한 잔여 시간은 알 수 없으므로 accessValidity 로 등록한다.
+        // 토큰이 그전에 만료돼도 게이트웨이 파싱 단계에서 이미 거부되므로 무해하다.
+        redisService.set(RedisKey.BLACKLIST.getPrefix() + jti, "1", jwtProvider.getAccessValidity());
+    }
 }

@@ -267,6 +267,30 @@ class UserManagementServiceImplTest {
     }
 
     @Test
+    @DisplayName("block - 성공 시 BLOCK 전환 + access 토큰 무효화 + refresh 삭제")
+    void block_success() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        userManagementService.block(1L);
+
+        assertThat(user.getStatus()).isEqualTo(Status.BLOCK);
+        verify(tokenBlacklistService).blacklistByUserId(1L);
+        verify(redisService).delete(anyString());
+    }
+
+    @Test
+    @DisplayName("sleep - 성공 시 SLEEP 전환 + access 토큰 무효화 + refresh 삭제")
+    void sleep_success() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        userManagementService.sleep(1L);
+
+        assertThat(user.getStatus()).isEqualTo(Status.SLEEP);
+        verify(tokenBlacklistService).blacklistByUserId(1L);
+        verify(redisService).delete(anyString());
+    }
+
+    @Test
     @DisplayName("activate - 탈퇴 계정은 활성화 불가")
     void activate_withdrawn() {
         user.setStatus(Status.WITHDRAW);

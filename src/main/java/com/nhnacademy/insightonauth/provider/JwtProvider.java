@@ -51,7 +51,7 @@ public class JwtProvider {
     public String createAccessToken(Long userId, List<String> roles, String userName) {
         Instant now = Instant.now();
         String jti = UUID.randomUUID().toString();
-        return Jwts.builder()
+        String token = Jwts.builder()
                 .header()
                 .keyId(keyId)
                 .and()
@@ -63,6 +63,14 @@ public class JwtProvider {
                 .expiration(Date.from(now.plus(accessValidity)))
                 .signWith(privateKey)
                 .compact();
+
+        // userId → 현재 access jti. 강제 로그아웃/정지/동시 로그인 축출 시 이 값으로 블랙리스트에 올린다.
+        redisService.set(RedisKey.ACCESS_JTI.getPrefix() + userId, jti, accessValidity);
+        return token;
+    }
+
+    public Duration getAccessValidity() {
+        return accessValidity;
     }
 
     public String createRefreshToken(Long userId, List<String> roles) {

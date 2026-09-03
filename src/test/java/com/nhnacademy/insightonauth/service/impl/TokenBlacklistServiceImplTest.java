@@ -118,4 +118,25 @@ class TokenBlacklistServiceImplTest {
 
         verify(redisService, never()).set(anyString(), anyString(), any());
     }
+
+    @Test
+    @DisplayName("blacklistByUserId - 활성 access jti 가 있으면 블랙리스트에 등록")
+    void blacklistByUserId_found() {
+        when(redisService.get(RedisKey.ACCESS_JTI.getPrefix() + 1L)).thenReturn("jti-x");
+        when(jwtProvider.getAccessValidity()).thenReturn(Duration.ofMinutes(15));
+
+        tokenBlacklistService.blacklistByUserId(1L);
+
+        verify(redisService).set(RedisKey.BLACKLIST.getPrefix() + "jti-x", "1", Duration.ofMinutes(15));
+    }
+
+    @Test
+    @DisplayName("blacklistByUserId - 활성 세션이 없으면 스킵")
+    void blacklistByUserId_notFound() {
+        when(redisService.get(RedisKey.ACCESS_JTI.getPrefix() + 1L)).thenReturn(null);
+
+        tokenBlacklistService.blacklistByUserId(1L);
+
+        verify(redisService, never()).set(anyString(), anyString(), any());
+    }
 }
