@@ -19,8 +19,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -73,6 +77,36 @@ class JwtProviderTest {
         assertThat(c.get("name", String.class)).isEqualTo("홍길동");
         assertThat(c.getId()).isNotBlank();
         assertThat(c.getExpiration()).isAfter(c.getIssuedAt());
+    }
+
+    @Test
+    @DisplayName("createAccessToken — 새 jti 를 access-jti:{userId} 에 저장 (직전 값 원자적 조회)")
+    void createAccessToken_storesAccessJti() {
+        String token = jwtProvider.createAccessToken(1L, List.of("MEMBER"), "n");
+
+        String jti = jwtProvider.parse(token).getId();
+        verify(redisService).setAndGetPrevious("access-jti:1", jti, Duration.ofMinutes(15));
+    }
+
+    @Test
+    @DisplayName("createAccessToken — 직전 access jti 를 즉시 블랙리스트에 등록 (last-wins)")
+    void createAccessToken_blacklistsPreviousJti() {
+        when(redisService.setAndGetPrevious(eq("access-jti:1"), anyString(), any()))
+                .thenReturn("previous-jti");
+
+        jwtProvider.createAccessToken(1L, List.of("MEMBER"), "n");
+
+        verify(redisService).set("blacklist:previous-jti", "1", Duration.ofMinutes(15));
+    }
+
+    @Test
+    @DisplayName("createAccessToken — 직전 jti 가 없으면 블랙리스트 등록 안 함")
+    void createAccessToken_noPreviousJti() {
+        when(redisService.setAndGetPrevious(eq("access-jti:1"), anyString(), any())).thenReturn(null);
+
+        jwtProvider.createAccessToken(1L, List.of("MEMBER"), "n");
+
+        verify(redisService, never()).set(startsWith("blacklist:"), anyString(), any());
     }
 
     @Test

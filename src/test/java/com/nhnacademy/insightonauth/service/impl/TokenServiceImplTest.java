@@ -5,7 +5,6 @@ import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserRole;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
-import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.service.UserRoleService;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,17 +16,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.startsWith;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -78,28 +71,8 @@ class TokenServiceImplTest {
         assertThat(userLoginResult.refreshToken()).isEqualTo("refreshToken");
     }
 
-    @Test
-    @DisplayName("이전 세션 access jti 가 있으면 발급 전에 블랙리스트에 올린다 (동시 로그인 차단)")
-    void issueTokens_kicksPreviousSession() {
-        when(userRoleService.findByUser(user)).thenReturn(List.of(new UserRole(user, Role.MEMBER)));
-        when(redisService.get(RedisKey.ACCESS_JTI.getPrefix() + 1L)).thenReturn("old-jti");
-        when(jwtProvider.getAccessValidity()).thenReturn(Duration.ofMinutes(15));
-
-        tokenService.issueTokens(user, user.getEmail());
-
-        verify(redisService).set(RedisKey.BLACKLIST.getPrefix() + "old-jti", "1", Duration.ofMinutes(15));
-    }
-
-    @Test
-    @DisplayName("이전 세션이 없으면 블랙리스트 등록 없이 발급")
-    void issueTokens_noPreviousSession() {
-        when(userRoleService.findByUser(user)).thenReturn(List.of(new UserRole(user, Role.MEMBER)));
-        when(redisService.get(RedisKey.ACCESS_JTI.getPrefix() + 1L)).thenReturn(null);
-
-        tokenService.issueTokens(user, user.getEmail());
-
-        verify(redisService, never()).set(startsWith(RedisKey.BLACKLIST.getPrefix()), anyString(), any());
-    }
+    // 동시 로그인 차단(직전 access jti 블랙리스트)은 JwtProvider.createAccessToken 으로
+    // 옮겨졌다 → JwtProviderTest 참고. 여기서는 mock 이라 검증 대상 아님.
 
     @Test
     @DisplayName("7일 이내 탈퇴면 복구 가능함")

@@ -64,8 +64,15 @@ public class JwtProvider {
                 .signWith(privateKey)
                 .compact();
 
-        // userId → 현재 access jti. 강제 로그아웃/정지/동시 로그인 축출 시 이 값으로 블랙리스트에 올린다.
-        redisService.set(RedisKey.ACCESS_JTI.getPrefix() + userId, jti, accessValidity);
+        // userId → 현재 access jti. 강제 로그아웃/정지 시 이 값으로 블랙리스트에 올린다.
+        // 새 jti 를 저장하면서 직전 jti 를 원자적으로 받아 즉시 블랙리스트에 등록한다.
+        // → 로그인·refresh·동시 로그인(이중화 포함) 어느 경로로 재발급되든
+        //   "유저별 살아있는 access jti 는 항상 1개" 가 유지된다 (last-wins).
+        String previousJti = redisService.setAndGetPrevious(
+                RedisKey.ACCESS_JTI.getPrefix() + userId, jti, accessValidity);
+        if (previousJti != null && !previousJti.equals(jti)) {
+            redisService.set(RedisKey.BLACKLIST.getPrefix() + previousJti, "1", accessValidity);
+        }
         return token;
     }
 
