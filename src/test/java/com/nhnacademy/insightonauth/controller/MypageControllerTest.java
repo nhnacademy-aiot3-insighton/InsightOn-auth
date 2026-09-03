@@ -30,7 +30,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -146,19 +145,8 @@ class MypageControllerTest {
                 .andExpect(jsonPath("$[0].provider").value("google"));
     }
 
-    @Test
-    @DisplayName("POST /me/oauths/{provider} — 201")
-    void linkOauth() throws Exception {
-        mvc.perform(post("/api/v1/users/me/oauths/google")
-                        .header("X-User-Id", "1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                { "code": "oauth-code" }
-                                """))
-                .andExpect(status().isCreated());
-
-        verify(myPageService).linkOauth(1L, "google", "oauth-code");
-    }
+    // 소셜 계정 신규 연동은 브라우저 주도 왕복이라 auth 의 GET /oauth/link/authorize/{provider} 로 이동함
+    // (AuthControllerTest 에서 콜백 분기를 검증)
 
     @Test
     @DisplayName("DELETE /me/oauths/{oauthId} — 204")

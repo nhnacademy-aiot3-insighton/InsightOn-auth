@@ -1,12 +1,15 @@
 package com.nhnacademy.insightonauth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nhnacademy.insightonauth.controller.support.LoginResponder;
+import com.nhnacademy.insightonauth.controller.support.OauthWebSupport;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
 import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.handler.GlobalExceptionHandler;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
+import com.nhnacademy.insightonauth.service.MyPageService;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
 import com.nhnacademy.insightonauth.service.UserEmailService;
 import com.nhnacademy.insightonauth.service.UserManagementService;
@@ -35,7 +38,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -58,7 +60,9 @@ class AuthControllerTest {
     @MockitoBean UserManagementService userManagementService;
     @MockitoBean JwtProvider jwtProvider;
     @MockitoBean UserRoleService userRoleService; // HeaderAuthenticationFilter 의존성
-    @MockitoBean OauthWebSupport oauthWebSupport; // 브라우저 주도 OAuth 엔드포인트 의존성
+    @MockitoBean
+    OauthWebSupport oauthWebSupport; // 브라우저 주도 OAuth 엔드포인트 의존성
+    @MockitoBean MyPageService myPageService; // /oauth/callback 연동(link) 분기 의존성
 
     @Test
     @DisplayName("POST /email/verify-request — 204")

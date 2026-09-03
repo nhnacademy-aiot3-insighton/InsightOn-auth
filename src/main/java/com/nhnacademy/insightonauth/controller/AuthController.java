@@ -1,13 +1,18 @@
 package com.nhnacademy.insightonauth.controller;
 
+import com.nhnacademy.insightonauth.controller.support.LoginResponder;
+import com.nhnacademy.insightonauth.controller.support.OauthWebSupport;
 import com.nhnacademy.insightonauth.dto.auth.*;
 import com.nhnacademy.insightonauth.dto.oauth.OauthLoginRequest;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.exception.auth.InvalidCredentialsException;
 import com.nhnacademy.insightonauth.exception.auth.InvalidRefreshTokenException;
 import com.nhnacademy.insightonauth.exception.auth.RefreshTokenNotFoundException;
+import com.nhnacademy.insightonauth.exception.oauth.OauthAlreadyLinkedException;
+import com.nhnacademy.insightonauth.exception.oauth.OauthLinkedToOtherAccountException;
 import com.nhnacademy.insightonauth.exception.signup.EmailAlreadyRegisteredException;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
+import com.nhnacademy.insightonauth.service.MyPageService;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
 import com.nhnacademy.insightonauth.service.UserEmailService;
 import com.nhnacademy.insightonauth.service.UserManagementService;
@@ -41,6 +46,7 @@ public class AuthController {
     private final JwtProvider jwtProvider;
     private final LoginResponder loginResponder;
     private final OauthWebSupport oauthWebSupport;
+    private final MyPageService myPageService;
 
     // 회원가입용 이메일 인증 코드 발송 요청 (재전송 쿨다운·횟수 제한 적용)
     @PostMapping("/email/verify-request")
@@ -149,12 +155,31 @@ public class AuthController {
                 .build();
     }
 
+    // 마이페이지 소셜 계정 연동 — 로그인과 동일한 브라우저 주도 왕복.
+    //   프론트 "연동" 버튼 → 여기 → provider 동의 화면 → GET /oauth/callback (state 에 .link 표시)
+    //   → auth 가 code 교환·연동까지 끝내고 프론트 /mypage 로 302
+    @GetMapping("/oauth/link/authorize/{provider}")
+    public ResponseEntity<Void> oauthLinkAuthorize(
+            @PathVariable String provider,
+            @CookieValue(value = "accessToken", required = false) String accessToken) {
+
+        if (!oauthWebSupport.supports(provider) || parseUserId(accessToken) == null) {
+            return redirect(oauthWebSupport.front("/mypage?linkError=1"), null);
+        }
+        String state = UUID.randomUUID() + "." + provider + ".link";
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .header(HttpHeaders.SET_COOKIE, oauthWebSupport.stateCookie(state).toString())
+                .header(HttpHeaders.LOCATION, oauthWebSupport.authorizeUrl(provider, state))
+                .build();
+    }
+
     @GetMapping("/oauth/callback")
     public ResponseEntity<Void> oauthCallback(
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String state,
             @RequestParam(required = false) String error,
-            @CookieValue(value = OauthWebSupport.STATE_COOKIE, required = false) String expectedState) {
+            @CookieValue(value = OauthWebSupport.STATE_COOKIE, required = false) String expectedState,
+            @CookieValue(value = "accessToken", required = false) String accessToken) {
 
         // state 쿠키는 1회용 — 검증 결과와 무관하게 폐기
         String expiredState = oauthWebSupport.expiredStateCookie().toString();
@@ -165,7 +190,28 @@ public class AuthController {
             return redirect(oauthWebSupport.front("/login?oauthError=1"), expiredState);
         }
 
-        String provider = state.substring(state.lastIndexOf('.') + 1);
+        String[] parts = state.split("\\.");                 // [nonce, provider, "link"?]
+        String provider = parts[1];
+        boolean link = parts.length > 2 && "link".equals(parts[2]);
+
+        if (link) {
+            Long userId = parseUserId(accessToken);
+            if (userId == null) {
+                return redirect(oauthWebSupport.front("/mypage?linkError=auth"), expiredState);
+            }
+            try {
+                myPageService.linkOauth(userId, provider, code);
+                return redirect(oauthWebSupport.front("/mypage?linked=1"), expiredState);
+            } catch (OauthAlreadyLinkedException e) {
+                return redirect(oauthWebSupport.front("/mypage?linkError=already"), expiredState);
+            } catch (OauthLinkedToOtherAccountException e) {
+                return redirect(oauthWebSupport.front("/mypage?linkError=other_account"), expiredState);
+            } catch (RuntimeException e) {
+                log.warn("[OAuth] 연동 실패: {}", e.getMessage());
+                return redirect(oauthWebSupport.front("/mypage?linkError=1"), expiredState);
+            }
+        }
+
         try {
             UserLoginResult result = userAuthenticationService.oauthLogin(provider, code);
 
@@ -194,6 +240,18 @@ public class AuthController {
             b.header(HttpHeaders.SET_COOKIE, extraSetCookie);
         }
         return b.build();
+    }
+
+    /** accessToken 쿠키에서 userId. 없거나 서명·만료 검증 실패면 null. */
+    private Long parseUserId(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(jwtProvider.parse(accessToken).getSubject());
+        } catch (JwtException | NumberFormatException e) {
+            return null;
+        }
     }
 
     // refresh 토큰 쿠키로 새 access 토큰 재발급 (쿠키 없음/서명·만료 오류면 예외)
