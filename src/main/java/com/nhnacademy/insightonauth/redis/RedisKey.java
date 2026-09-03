@@ -4,6 +4,10 @@ public enum RedisKey {
     // 리프레시 토큰 (userId → jti). 재발급/로그아웃 시 검증에 사용
     REFRESH("refresh:"),
 
+    // 현재 유효한 액세스 토큰 (userId → jti, accessValidity).
+    // 강제 로그아웃·계정 정지·동시 로그인 축출 시 이 jti 를 블랙리스트에 올린다.
+    ACCESS_JTI("access-jti:"),
+
     // 이메일 인증 최종 완료 토큰 (email → token, 15분). 회원가입 시 인증 여부 확인
     VERIFIED("verified:"),
 

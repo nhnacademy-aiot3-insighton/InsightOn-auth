@@ -289,6 +289,15 @@ class UserAuthenticationServiceImplTest {
     }
 
     @Test
+    @DisplayName("forceLogout - 현재 access 토큰 무효화 + refresh 삭제")
+    void forceLogout() {
+        authService.forceLogout(1L);
+
+        verify(tokenBlacklistService).blacklistByUserId(1L);
+        verify(redisService).delete(contains("refresh"));
+    }
+
+    @Test
     @DisplayName("refresh - 토큰 검증 실패면 예외")
     void refresh_invalidToken() {
         doThrow(new JwtException("bad")).when(jwtProvider).validateRefreshToken(1L, "rt");

@@ -30,6 +30,9 @@ public class TokenServiceImpl implements TokenService {
                 .map(userRole -> userRole.getRole().name())
                 .toList();
 
+        // 동시 로그인 차단(last-wins)은 createAccessToken 이 처리한다 —
+        // 직전 access jti 를 원자적으로 블랙리스트에 올리고, createRefreshToken 이
+        // refresh:{userId} 를 덮어쓴다. 밀려난 세션은 다음 요청에서 401 → refresh 실패로 로그아웃.
         String accessToken = jwtProvider.createAccessToken(user.getUserId(), roles, user.getUserName());
         String refreshToken = jwtProvider.createRefreshToken(user.getUserId(), roles);
 

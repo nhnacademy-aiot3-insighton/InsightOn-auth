@@ -174,7 +174,8 @@ public class UserManagementServiceImpl implements UserManagementService {
         user.setStatus(Status.SLEEP);
         user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
 
-        // 차단 시 리프레시 삭제 — 재발급 차단
+        // 현재 access 토큰 무효화 + 리프레시 삭제 — 재발급 차단
+        tokenBlacklistService.blacklistByUserId(userId);
         redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
     }
 
@@ -193,7 +194,8 @@ public class UserManagementServiceImpl implements UserManagementService {
         user.setStatus(Status.BLOCK);
         user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
 
-        // 차단 시 리프레시 삭제 — 재발급 차단
+        // 현재 access 토큰 무효화 + 리프레시 삭제 — 재발급 차단
+        tokenBlacklistService.blacklistByUserId(userId);
         redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
     }
 

@@ -71,6 +71,9 @@ class TokenServiceImplTest {
         assertThat(userLoginResult.refreshToken()).isEqualTo("refreshToken");
     }
 
+    // 동시 로그인 차단(직전 access jti 블랙리스트)은 JwtProvider.createAccessToken 으로
+    // 옮겨졌다 → JwtProviderTest 참고. 여기서는 mock 이라 검증 대상 아님.
+
     @Test
     @DisplayName("7일 이내 탈퇴면 복구 가능함")
     void isWithinRestorePeriod_true() {
