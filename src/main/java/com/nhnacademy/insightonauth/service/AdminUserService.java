@@ -2,10 +2,13 @@ package com.nhnacademy.insightonauth.service;
 
 import com.nhnacademy.insightonauth.dto.admin.AdminFindUsersResponse;
 import com.nhnacademy.insightonauth.dto.admin.AdminUserDetailResponse;
+import com.nhnacademy.insightonauth.dto.admin.RoleResponse;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+
+import java.util.List;
 
 public interface AdminUserService {
 
@@ -20,9 +23,9 @@ public interface AdminUserService {
 
     void activate(Long userId);
 
-    void addUserRole(Long userId, Role role);
+    void updateUserRoles(Long userId, List<Role> roleList);
 
-    void removeUserRole(Long userId, Role role);
+    List<RoleResponse> findAssignableRoles();
 
     void forceLogout(Long userId);
 }
