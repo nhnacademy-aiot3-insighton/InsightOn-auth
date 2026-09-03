@@ -31,6 +31,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -119,7 +120,19 @@ class AdminControllerTest {
 
         mvc.perform(get("/api/v1/admin/users"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].email").value("a@test.com"));
+                .andExpect(jsonPath("$.content[0].email").value("a@test.com"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.number").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /users?status= — 빈 status 는 전체 조회 (200)")
+    void findUsers_blankStatus() throws Exception {
+        when(adminUserService.findUsers(any(), any(), isNull(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        mvc.perform(get("/api/v1/admin/users").param("status", ""))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -159,24 +172,24 @@ class AdminControllerTest {
     }
 
     @Test
-    @DisplayName("PUT /users/{userId}/roles — 200")
-    void changeRole() throws Exception {
+    @DisplayName("PUT /users/{userId}/roles — 204 (권한 전체 교체)")
+    void updateRoles() throws Exception {
         mvc.perform(put("/api/v1/admin/users/1/roles")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                { "role": "ADMIN" }
+                                { "roles": ["MEMBER"] }
                                 """))
-                .andExpect(status().isOk());
-        verify(adminUserService).addUserRole(1L, Role.ADMIN);
+                .andExpect(status().isNoContent());
+        verify(adminUserService).updateUserRoles(1L, List.of(Role.MEMBER));
     }
 
     @Test
-    @DisplayName("PUT /users/{userId}/roles — role 누락 400")
-    void changeRole_validation() throws Exception {
+    @DisplayName("PUT /users/{userId}/roles — roles 비어있으면 400")
+    void updateRoles_validation() throws Exception {
         mvc.perform(put("/api/v1/admin/users/1/roles")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {}
+                                { "roles": [] }
                                 """))
                 .andExpect(status().isBadRequest());
     }

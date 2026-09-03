@@ -4,7 +4,9 @@ package com.nhnacademy.insightonauth.controller;
 import com.nhnacademy.insightonauth.controller.support.LoginResponder;
 import com.nhnacademy.insightonauth.dto.admin.AdminFindUsersResponse;
 import com.nhnacademy.insightonauth.dto.admin.AdminUserDetailResponse;
-import com.nhnacademy.insightonauth.dto.admin.RoleChangeRequest;
+import com.nhnacademy.insightonauth.dto.admin.RoleResponse;
+import com.nhnacademy.insightonauth.dto.admin.RolesUpdateRequest;
+import com.nhnacademy.insightonauth.dto.common.PageResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginRequest;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
@@ -20,6 +22,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -53,16 +57,21 @@ public class AdminController {
         return loginResponder.success(result);
     }
 
-    // 회원 목록 조회 (검색·페이징)
+    // 회원 목록 조회 (검색·페이징). status 빈값/생략이면 전체 상태 조회.
     @GetMapping("/users")
-    public ResponseEntity<Page<AdminFindUsersResponse>> findUsers(
+    public ResponseEntity<PageResponse<AdminFindUsersResponse>> findUsers(
             @RequestParam(required = false) String email,
             @RequestParam(required = false) String userName,
-            @RequestParam(required = false) Status status,
+            @RequestParam(required = false) String status,
             Pageable pageable) {
 
-        Page<AdminFindUsersResponse> response = adminUserService.findUsers(email, userName, status, pageable);
-        return ResponseEntity.ok(response);
+        Status statusFilter = (status == null || status.isBlank())
+                ? null
+                : Status.valueOf(status.trim().toUpperCase());
+
+        Page<AdminFindUsersResponse> page =
+                adminUserService.findUsers(email, userName, statusFilter, pageable);
+        return ResponseEntity.ok(PageResponse.from(page));
     }
 
     // 회원 상세 조회
@@ -70,6 +79,12 @@ public class AdminController {
     public ResponseEntity<AdminUserDetailResponse> findUserDetail(@PathVariable Long userId) {
         AdminUserDetailResponse response = adminUserService.findUserDetail(userId);
         return ResponseEntity.ok(response);
+    }
+
+    // 지정 가능한 권한 목록
+    @GetMapping("/roles")
+    public ResponseEntity<List<RoleResponse>> roles() {
+        return ResponseEntity.ok(adminUserService.findAssignableRoles());
     }
 
     // 회원 계정 차단
@@ -93,14 +108,14 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
-    // 회원 권한 변경
+    // 회원 권한 변경 — 요청 바디의 목록으로 전체 교체 (유지/추가/삭제 자동 계산)
     @PutMapping("/users/{userId}/roles")
-    public ResponseEntity<Void> changeRole(
+    public ResponseEntity<Void> updateRoles(
             @PathVariable Long userId,
-            @RequestBody @Valid RoleChangeRequest request) {
+            @RequestBody @Valid RolesUpdateRequest request) {
 
-        adminUserService.addUserRole(userId, request.role());
-        return ResponseEntity.ok().build();
+        adminUserService.updateUserRoles(userId, request.roles());
+        return ResponseEntity.noContent().build();
     }
 
     // 강제 로그아웃
