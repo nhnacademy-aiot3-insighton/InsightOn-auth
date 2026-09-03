@@ -163,10 +163,13 @@ public class AuthController {
             @PathVariable String provider,
             @CookieValue(value = "accessToken", required = false) String accessToken) {
 
-        if (!oauthWebSupport.supports(provider) || parseUserId(accessToken) == null) {
+        Long userId = parseUserId(accessToken);
+        if (!oauthWebSupport.supports(provider) || userId == null) {
             return redirect(oauthWebSupport.front("/mypage?linkError=1"), null);
         }
-        String state = UUID.randomUUID() + "." + provider + ".link";
+        // 연동 대상 userId 를 state 에 실어 둔다. state 는 콜백에서 서버가 심은 oauthState 쿠키와
+        // 통째로 대조되므로(위조 불가), 콜백은 이 값을 "연동을 시작한 유저"로 신뢰할 수 있다.
+        String state = UUID.randomUUID() + "." + provider + ".link." + userId;
         return ResponseEntity.status(HttpStatus.FOUND)
                 .header(HttpHeaders.SET_COOKIE, oauthWebSupport.stateCookie(state).toString())
                 .header(HttpHeaders.LOCATION, oauthWebSupport.authorizeUrl(provider, state))
@@ -184,23 +187,32 @@ public class AuthController {
         // state 쿠키는 1회용 — 검증 결과와 무관하게 폐기
         String expiredState = oauthWebSupport.expiredStateCookie().toString();
 
+        // 연동 왕복이었는지는 서버가 심은 state 쿠키로 판단한다(쿼리 state 는 검증 전이라 신뢰 불가).
+        // provider 취소(error=access_denied)·code 누락도 연동이었으면 마이페이지로 돌려보낸다.
+        // state 형식: 로그인 "<uuid>.<provider>", 연동 "<uuid>.<provider>.link.<userId>" — nonce·provider 에 점 없음.
+        boolean link = expectedState != null && expectedState.contains(".link");
+        String errorRedirect = link ? "/mypage?linkError=1" : "/login?oauthError=1";
+
         if (error != null || code == null || state == null
                 || expectedState == null || !state.equals(expectedState)) {
-            log.warn("[OAuth] 콜백 검증 실패: error={}, stateMatched={}", error, state != null && state.equals(expectedState));
-            return redirect(oauthWebSupport.front("/login?oauthError=1"), expiredState);
+            log.warn("[OAuth] 콜백 검증 실패: error={}, link={}, stateMatched={}",
+                    error, link, state != null && state.equals(expectedState));
+            return redirect(oauthWebSupport.front(errorRedirect), expiredState);
         }
 
-        String[] parts = state.split("\\.");                 // [nonce, provider, "link"?]
+        String[] parts = state.split("\\.");                 // [nonce, provider, "link"?, userId?]
         String provider = parts[1];
-        boolean link = parts.length > 2 && "link".equals(parts[2]);
 
         if (link) {
-            Long userId = parseUserId(accessToken);
-            if (userId == null) {
+            // state 의 userId(연동 시작 유저) 와 콜백 시점 accessToken 쿠키의 userId(현재 로그인 유저) 가
+            // 같아야만 연동을 진행한다. 동의 화면을 띄운 뒤 다른 탭에서 계정을 바꾸면 여기서 걸린다.
+            Long stateUserId = parts.length > 3 ? toUserId(parts[3]) : null;
+            Long currentUserId = parseUserId(accessToken);
+            if (stateUserId == null || !stateUserId.equals(currentUserId)) {
                 return redirect(oauthWebSupport.front("/mypage?linkError=auth"), expiredState);
             }
             try {
-                myPageService.linkOauth(userId, provider, code);
+                myPageService.linkOauth(stateUserId, provider, code);
                 return redirect(oauthWebSupport.front("/mypage?linked=1"), expiredState);
             } catch (OauthAlreadyLinkedException e) {
                 return redirect(oauthWebSupport.front("/mypage?linkError=already"), expiredState);
@@ -250,6 +262,15 @@ public class AuthController {
         try {
             return Long.valueOf(jwtProvider.parse(accessToken).getSubject());
         } catch (JwtException | NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** state 에 실린 userId 문자열 → Long. 숫자가 아니면 null. */
+    private Long toUserId(String raw) {
+        try {
+            return Long.valueOf(raw);
+        } catch (NumberFormatException e) {
             return null;
         }
     }
