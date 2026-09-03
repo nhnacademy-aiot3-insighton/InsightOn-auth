@@ -12,6 +12,7 @@ import com.nhnacademy.insightonauth.dto.auth.UserLoginRequest;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.exception.auth.InvalidCredentialsException;
+import com.nhnacademy.insightonauth.exception.user.InvalidUserStatusValueException;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.service.AdminUserService;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
@@ -65,9 +66,14 @@ public class AdminController {
             @RequestParam(required = false) String status,
             Pageable pageable) {
 
-        Status statusFilter = (status == null || status.isBlank())
-                ? null
-                : Status.valueOf(status.trim().toUpperCase());
+        Status statusFilter = null;
+        if (status != null && !status.isBlank()) {
+            try {
+                statusFilter = Status.valueOf(status.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new InvalidUserStatusValueException("알 수 없는 상태값입니다: " + status);
+            }
+        }
 
         Page<AdminFindUsersResponse> page =
                 adminUserService.findUsers(email, userName, statusFilter, pageable);

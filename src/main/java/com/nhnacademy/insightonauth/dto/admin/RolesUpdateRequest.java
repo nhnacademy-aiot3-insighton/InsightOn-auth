@@ -2,6 +2,7 @@ package com.nhnacademy.insightonauth.dto.admin;
 
 import com.nhnacademy.insightonauth.entity.Role;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
@@ -11,6 +12,6 @@ import java.util.List;
  */
 public record RolesUpdateRequest(
         @NotEmpty(message = "권한을 1개 이상 지정해주세요.")
-        List<Role> roles
+        List<@NotNull(message = "권한 값은 비어 있을 수 없습니다.") Role> roles
 ) {
 }

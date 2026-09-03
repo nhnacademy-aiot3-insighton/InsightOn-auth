@@ -136,6 +136,13 @@ class AdminControllerTest {
     }
 
     @Test
+    @DisplayName("GET /users?status=UNKNOWN — 알 수 없는 상태값은 400")
+    void findUsers_invalidStatus() throws Exception {
+        mvc.perform(get("/api/v1/admin/users").param("status", "UNKNOWN"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("GET /users/{userId} — 200, 상세")
     void findUserDetail() throws Exception {
         when(adminUserService.findUserDetail(1L)).thenReturn(
@@ -190,6 +197,17 @@ class AdminControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 { "roles": [] }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT /users/{userId}/roles — roles 항목에 null 이 있으면 400")
+    void updateRoles_nullElement() throws Exception {
+        mvc.perform(put("/api/v1/admin/users/1/roles")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "roles": [null] }
                                 """))
                 .andExpect(status().isBadRequest());
     }
