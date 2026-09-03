@@ -1,5 +1,6 @@
 package com.nhnacademy.insightonauth.controller;
 
+import com.nhnacademy.insightonauth.controller.support.LoginResponder;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.handler.GlobalExceptionHandler;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;

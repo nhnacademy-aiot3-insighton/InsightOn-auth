@@ -1,4 +1,4 @@
-package com.nhnacademy.insightonauth.controller;
+package com.nhnacademy.insightonauth.controller.support;
 
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
@@ -32,18 +32,18 @@ public class LoginResponder {
         this.cookieSecure = cookieSecure;
     }
 
-    ResponseEntity<UserLoginResponse> success(UserLoginResult result) {
+    public ResponseEntity<UserLoginResponse> success(UserLoginResult result) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookie(result.refreshToken()).toString())
                 .body(UserLoginResponse.success(result.accessToken()));
     }
 
     /** 브라우저 주도 소셜 로그인은 바디를 못 주므로 access 토큰도 쿠키로 내려준다. */
-    ResponseCookie accessTokenCookie(String accessToken) {
+    public ResponseCookie accessTokenCookie(String accessToken) {
         return tokenCookie("accessToken", accessToken, accessTokenValidity);
     }
 
-    ResponseCookie refreshTokenCookie(String refreshToken) {
+    public ResponseCookie refreshTokenCookie(String refreshToken) {
         return tokenCookie("refreshToken", refreshToken, refreshTokenValidity);
     }
 

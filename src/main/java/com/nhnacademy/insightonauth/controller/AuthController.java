@@ -1,13 +1,18 @@
 package com.nhnacademy.insightonauth.controller;
 
+import com.nhnacademy.insightonauth.controller.support.LoginResponder;
+import com.nhnacademy.insightonauth.controller.support.OauthWebSupport;
 import com.nhnacademy.insightonauth.dto.auth.*;
 import com.nhnacademy.insightonauth.dto.oauth.OauthLoginRequest;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.exception.auth.InvalidCredentialsException;
 import com.nhnacademy.insightonauth.exception.auth.InvalidRefreshTokenException;
 import com.nhnacademy.insightonauth.exception.auth.RefreshTokenNotFoundException;
+import com.nhnacademy.insightonauth.exception.oauth.OauthAlreadyLinkedException;
+import com.nhnacademy.insightonauth.exception.oauth.OauthLinkedToOtherAccountException;
 import com.nhnacademy.insightonauth.exception.signup.EmailAlreadyRegisteredException;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
+import com.nhnacademy.insightonauth.service.MyPageService;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
 import com.nhnacademy.insightonauth.service.UserEmailService;
 import com.nhnacademy.insightonauth.service.UserManagementService;
@@ -41,6 +46,7 @@ public class AuthController {
     private final JwtProvider jwtProvider;
     private final LoginResponder loginResponder;
     private final OauthWebSupport oauthWebSupport;
+    private final MyPageService myPageService;
 
     // 회원가입용 이메일 인증 코드 발송 요청 (재전송 쿨다운·횟수 제한 적용)
     @PostMapping("/email/verify-request")
@@ -149,23 +155,75 @@ public class AuthController {
                 .build();
     }
 
+    // 마이페이지 소셜 계정 연동 — 로그인과 동일한 브라우저 주도 왕복.
+    //   프론트 "연동" 버튼 → 여기 → provider 동의 화면 → GET /oauth/callback (state 에 .link 표시)
+    //   → auth 가 code 교환·연동까지 끝내고 프론트 /mypage 로 302
+    @GetMapping("/oauth/link/authorize/{provider}")
+    public ResponseEntity<Void> oauthLinkAuthorize(
+            @PathVariable String provider,
+            @CookieValue(value = "accessToken", required = false) String accessToken) {
+
+        Long userId = parseUserId(accessToken);
+        if (!oauthWebSupport.supports(provider) || userId == null) {
+            return redirect(oauthWebSupport.front("/mypage?linkError=1"), null);
+        }
+        // 연동 대상 userId 를 state 에 실어 둔다. state 는 콜백에서 서버가 심은 oauthState 쿠키와
+        // 통째로 대조되므로(위조 불가), 콜백은 이 값을 "연동을 시작한 유저"로 신뢰할 수 있다.
+        String state = UUID.randomUUID() + "." + provider + ".link." + userId;
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .header(HttpHeaders.SET_COOKIE, oauthWebSupport.stateCookie(state).toString())
+                .header(HttpHeaders.LOCATION, oauthWebSupport.authorizeUrl(provider, state))
+                .build();
+    }
+
     @GetMapping("/oauth/callback")
     public ResponseEntity<Void> oauthCallback(
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String state,
             @RequestParam(required = false) String error,
-            @CookieValue(value = OauthWebSupport.STATE_COOKIE, required = false) String expectedState) {
+            @CookieValue(value = OauthWebSupport.STATE_COOKIE, required = false) String expectedState,
+            @CookieValue(value = "accessToken", required = false) String accessToken) {
 
         // state 쿠키는 1회용 — 검증 결과와 무관하게 폐기
         String expiredState = oauthWebSupport.expiredStateCookie().toString();
 
+        // 연동 왕복이었는지는 서버가 심은 state 쿠키로 판단한다(쿼리 state 는 검증 전이라 신뢰 불가).
+        // provider 취소(error=access_denied)·code 누락도 연동이었으면 마이페이지로 돌려보낸다.
+        // state 형식: 로그인 "<uuid>.<provider>", 연동 "<uuid>.<provider>.link.<userId>" — nonce·provider 에 점 없음.
+        boolean link = expectedState != null && expectedState.contains(".link");
+        String errorRedirect = link ? "/mypage?linkError=1" : "/login?oauthError=1";
+
         if (error != null || code == null || state == null
                 || expectedState == null || !state.equals(expectedState)) {
-            log.warn("[OAuth] 콜백 검증 실패: error={}, stateMatched={}", error, state != null && state.equals(expectedState));
-            return redirect(oauthWebSupport.front("/login?oauthError=1"), expiredState);
+            log.warn("[OAuth] 콜백 검증 실패: error={}, link={}, stateMatched={}",
+                    error, link, state != null && state.equals(expectedState));
+            return redirect(oauthWebSupport.front(errorRedirect), expiredState);
         }
 
-        String provider = state.substring(state.lastIndexOf('.') + 1);
+        String[] parts = state.split("\\.");                 // [nonce, provider, "link"?, userId?]
+        String provider = parts[1];
+
+        if (link) {
+            // state 의 userId(연동 시작 유저) 와 콜백 시점 accessToken 쿠키의 userId(현재 로그인 유저) 가
+            // 같아야만 연동을 진행한다. 동의 화면을 띄운 뒤 다른 탭에서 계정을 바꾸면 여기서 걸린다.
+            Long stateUserId = parts.length > 3 ? toUserId(parts[3]) : null;
+            Long currentUserId = parseUserId(accessToken);
+            if (stateUserId == null || !stateUserId.equals(currentUserId)) {
+                return redirect(oauthWebSupport.front("/mypage?linkError=auth"), expiredState);
+            }
+            try {
+                myPageService.linkOauth(stateUserId, provider, code);
+                return redirect(oauthWebSupport.front("/mypage?linked=1"), expiredState);
+            } catch (OauthAlreadyLinkedException e) {
+                return redirect(oauthWebSupport.front("/mypage?linkError=already"), expiredState);
+            } catch (OauthLinkedToOtherAccountException e) {
+                return redirect(oauthWebSupport.front("/mypage?linkError=other_account"), expiredState);
+            } catch (RuntimeException e) {
+                log.warn("[OAuth] 연동 실패: {}", e.getMessage());
+                return redirect(oauthWebSupport.front("/mypage?linkError=1"), expiredState);
+            }
+        }
+
         try {
             UserLoginResult result = userAuthenticationService.oauthLogin(provider, code);
 
@@ -194,6 +252,27 @@ public class AuthController {
             b.header(HttpHeaders.SET_COOKIE, extraSetCookie);
         }
         return b.build();
+    }
+
+    /** accessToken 쿠키에서 userId. 없거나 서명·만료 검증 실패면 null. */
+    private Long parseUserId(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(jwtProvider.parse(accessToken).getSubject());
+        } catch (JwtException | NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** state 에 실린 userId 문자열 → Long. 숫자가 아니면 null. */
+    private Long toUserId(String raw) {
+        try {
+            return Long.valueOf(raw);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     // refresh 토큰 쿠키로 새 access 토큰 재발급 (쿠키 없음/서명·만료 오류면 예외)
