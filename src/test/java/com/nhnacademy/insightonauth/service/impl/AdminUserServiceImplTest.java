@@ -6,7 +6,9 @@ import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserRole;
+import com.nhnacademy.insightonauth.exception.user.InvalidUserRoleException;
 import com.nhnacademy.insightonauth.repository.UserRepository;
+import com.nhnacademy.insightonauth.service.TokenBlacklistService;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
 import com.nhnacademy.insightonauth.service.UserManagementService;
 import com.nhnacademy.insightonauth.service.UserRoleService;
@@ -26,6 +28,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +46,8 @@ class AdminUserServiceImplTest {
     private UserRoleService userRoleService;
     @Mock
     private UserManagementService userManagementService;
+    @Mock
+    private TokenBlacklistService tokenBlacklistService;
 
     @InjectMocks
     private AdminUserServiceImpl adminUserService;
@@ -107,23 +115,56 @@ class AdminUserServiceImplTest {
     }
 
     @Test
-    @DisplayName("역할 추가는 findById 후 addRole 호출")
-    void addUserRole() {
+    @DisplayName("updateUserRoles - MEMBER 를 ADMIN 으로 승격 (MEMBER 제거 + ADMIN 추가)")
+    void updateUserRoles_promote() {
         when(userManagementService.findById(1L)).thenReturn(user);
+        when(userRoleService.findByUser(user)).thenReturn(List.of(new UserRole(user, Role.MEMBER)));
 
-        adminUserService.addUserRole(1L, Role.ADMIN);
+        adminUserService.updateUserRoles(1L, List.of(Role.ADMIN));
 
         verify(userRoleService).addRole(user, Role.ADMIN);
+        verify(userRoleService).removeRole(user, Role.MEMBER);
+        verify(tokenBlacklistService).blacklistByUserId(1L);
     }
 
     @Test
-    @DisplayName("역할 제거는 findById 후 removeRole 호출")
-    void removeUserRole() {
+    @DisplayName("updateUserRoles - ADMIN 을 MEMBER 로 강등")
+    void updateUserRoles_demote() {
         when(userManagementService.findById(1L)).thenReturn(user);
+        when(userRoleService.findByUser(user)).thenReturn(List.of(new UserRole(user, Role.ADMIN)));
 
-        adminUserService.removeUserRole(1L, Role.ADMIN);
+        adminUserService.updateUserRoles(1L, List.of(Role.MEMBER));
 
+        verify(userRoleService).addRole(user, Role.MEMBER);
         verify(userRoleService).removeRole(user, Role.ADMIN);
+        verify(tokenBlacklistService).blacklistByUserId(1L);
+    }
+
+    @Test
+    @DisplayName("updateUserRoles - 현재와 동일하면 아무것도 안 함")
+    void updateUserRoles_noop() {
+        when(userManagementService.findById(1L)).thenReturn(user);
+        when(userRoleService.findByUser(user)).thenReturn(List.of(new UserRole(user, Role.MEMBER)));
+
+        adminUserService.updateUserRoles(1L, List.of(Role.MEMBER));
+
+        verify(userRoleService, never()).addRole(eq(user), any());
+        verify(userRoleService, never()).removeRole(eq(user), any());
+        verify(tokenBlacklistService, never()).blacklistByUserId(any());
+    }
+
+    @Test
+    @DisplayName("updateUserRoles - 빈 목록이면 예외")
+    void updateUserRoles_empty() {
+        assertThatThrownBy(() -> adminUserService.updateUserRoles(1L, List.of()))
+                .isInstanceOf(InvalidUserRoleException.class);
+    }
+
+    @Test
+    @DisplayName("updateUserRoles - ADMIN 은 다른 권한과 함께 지정 불가")
+    void updateUserRoles_adminNotCombinable() {
+        assertThatThrownBy(() -> adminUserService.updateUserRoles(1L, List.of(Role.MEMBER, Role.ADMIN)))
+                .isInstanceOf(InvalidUserRoleException.class);
     }
 
     @Test

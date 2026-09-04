@@ -1,4 +1,4 @@
-package com.nhnacademy.insightonauth.controller;
+package com.nhnacademy.insightonauth.controller.support;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;

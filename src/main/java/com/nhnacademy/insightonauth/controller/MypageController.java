@@ -4,7 +4,6 @@ import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
 import com.nhnacademy.insightonauth.dto.mypage.PasswordChangeRequest;
 import com.nhnacademy.insightonauth.dto.mypage.RoleResponse;
 import com.nhnacademy.insightonauth.dto.mypage.MyInfoUpdateRequest;
-import com.nhnacademy.insightonauth.dto.oauth.OauthLoginRequest;
 import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.service.MyPageService;
@@ -12,7 +11,6 @@ import com.nhnacademy.insightonauth.service.OauthService;
 import com.nhnacademy.insightonauth.service.UserManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -88,16 +86,8 @@ public class MypageController {
         return ResponseEntity.ok(response);
     }
 
-    // 소셜 계정 신규 연동
-    @PostMapping("/me/oauths/{provider}")
-    public ResponseEntity<Void> linkOauth(
-            @RequestHeader(name = X_USER_ID) @Valid Long userId,
-            @PathVariable String provider,
-            @RequestBody @Valid OauthLoginRequest request) {
-
-        myPageService.linkOauth(userId, provider, request.code());
-        return ResponseEntity.status(HttpStatus.CREATED).build();
-    }
+    // 소셜 계정 신규 연동은 브라우저 주도 왕복이 필요해 auth 의 GET /oauth/link/authorize/{provider} 가 담당한다.
+    // (provider 동의 화면 → GET /oauth/callback → AuthController 가 linkOauth 호출)
 
     // 소셜 계정 연동 해제
     @DeleteMapping("/me/oauths/{oauthId}")

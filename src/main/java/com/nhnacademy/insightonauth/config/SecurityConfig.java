@@ -46,7 +46,8 @@ public class SecurityConfig {
                                 "/internal/v1/**",
                                 "/api/v1/auth/tokens/*/blacklisted",
                                 "/v3/api-docs/**",
-                                "/api/v1/admin/login").permitAll()
+                                "/api/v1/admin/login",
+                                "http://insighton-zipkin:9411/api/v2/spans").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/users/me/**").authenticated()
                         .anyRequest().authenticated())
