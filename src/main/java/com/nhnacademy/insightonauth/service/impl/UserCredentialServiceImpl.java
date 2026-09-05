@@ -38,9 +38,9 @@ public class UserCredentialServiceImpl implements UserCredentialService {
 
     @Override
     public void delete(User user) {
-        UserCredential userCredential = findByUser(user);
-
-        userCredentialRepository.delete(userCredential);
+        // OAuth 전용 가입 계정은 애초에 크리덴셜이 없을 수 있다(비밀번호 미설정) — 계정 삭제 시
+        // "지울 게 있으면 지운다"가 맞고, findByUser()처럼 없다고 예외를 던지면 안 된다.
+        userCredentialRepository.findByUser(user).ifPresent(userCredentialRepository::delete);
     }
 
     @Override

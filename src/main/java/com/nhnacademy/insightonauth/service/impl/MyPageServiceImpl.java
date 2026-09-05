@@ -139,10 +139,33 @@ public class MyPageServiceImpl implements MyPageService {
             throw new InvalidMergeRequestException("병합 요청이 유효하지 않습니다.");
         }
 
+        // secondaryUser 삭제 직전 재확인 — 그룹 관리자면 병합(=계정 삭제)로 탈퇴 제한을 우회할 수 없다
+        boolean isGroupManager;
+        try {
+            isGroupManager = coreService.isGroupManager(secondaryUserId);
+        } catch (Exception e) {
+            throw new CoreServiceUnavailableException(
+                    "일시적으로 그룹 정보를 확인할 수 없어 병합이 제한됩니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        if (isGroupManager) {
+            throw new ManagerGroupExistsException("그룹 관리자 역할이 있는 계정은 병합할 수 없습니다.");
+        }
+
         // Oauth를 primaryUser로 재연결
         secondaryOauth.reassignUser(primaryUser);
 
         // secondaryUser(연동 전에 사용하던 계정 삭제) 삭제
         userManagementService.deleteUser(secondaryUserId);
+    }
+
+    // 병합 확인 시 provider 재인증 왕복으로 받은 code — 이 code로 방금 교환한 providerUserId만 신뢰한다
+    // (클라이언트가 주장하는 providerUserId를 그대로 믿지 않기 위함)
+    @Override
+    public void confirmMerge(Long primaryUserId, Long secondaryUserId, String provider, String code) {
+        OauthClient oauthClient = oauthClientResolver.resolve(provider);
+        OauthUserInfo userInfo = oauthClient.getUserInfo(code);
+
+        mergeAccount(primaryUserId, secondaryUserId, provider, userInfo.providerId());
     }
 }

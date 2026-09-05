@@ -19,4 +19,6 @@ public interface MyPageService {
     void linkOauth(Long userId, String provider, String code);
 
     void mergeAccount(Long primaryUserId, Long secondaryUserId, String provider, String providerUserId);
+
+    void confirmMerge(Long primaryUserId, Long secondaryUserId, String provider, String code);
 }
