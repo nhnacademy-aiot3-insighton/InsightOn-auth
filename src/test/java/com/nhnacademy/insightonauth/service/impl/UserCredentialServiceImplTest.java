@@ -87,6 +87,16 @@ class UserCredentialServiceImplTest {
     }
 
     @Test
+    @DisplayName("자격 증명 삭제 - OAuth 전용 가입이라 크리덴셜이 없어도 예외 없이 종료")
+    void delete_noCredential() {
+        when(userCredentialRepository.findByUser(user)).thenReturn(Optional.empty());
+
+        userCredentialService.delete(user);
+
+        verify(userCredentialRepository, never()).delete(any(UserCredential.class));
+    }
+
+    @Test
     @DisplayName("비밀번호 변경됨 - 기존과 다르면 암호화 후 저장")
     void updatePassword() {
         UserCredential userCredential = mock(UserCredential.class);

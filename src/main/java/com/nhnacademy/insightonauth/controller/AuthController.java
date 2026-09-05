@@ -11,6 +11,7 @@ import com.nhnacademy.insightonauth.exception.auth.RefreshTokenNotFoundException
 import com.nhnacademy.insightonauth.exception.oauth.OauthAlreadyLinkedException;
 import com.nhnacademy.insightonauth.exception.oauth.OauthLinkedToOtherAccountException;
 import com.nhnacademy.insightonauth.exception.signup.EmailAlreadyRegisteredException;
+import com.nhnacademy.insightonauth.exception.user.ManagerGroupExistsException;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.service.MyPageService;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
@@ -158,9 +159,12 @@ public class AuthController {
     // 마이페이지 소셜 계정 연동 — 로그인과 동일한 브라우저 주도 왕복.
     //   프론트 "연동" 버튼 → 여기 → provider 동의 화면 → GET /oauth/callback (state 에 .link 표시)
     //   → auth 가 code 교환·연동까지 끝내고 프론트 /mypage 로 302
+    //   mergeWith 가 있으면(다른 계정에 이미 연동된 걸 병합하겠다는 확인) provider 재인증을 한 번 더 거치게 해서
+    //   지금도 그 소셜 계정을 실제로 통제하는지 재확인한 뒤 콜백에서 연동 대신 병합을 수행한다.
     @GetMapping("/oauth/link/authorize/{provider}")
     public ResponseEntity<Void> oauthLinkAuthorize(
             @PathVariable String provider,
+            @RequestParam(required = false) Long mergeWith,
             @CookieValue(value = "accessToken", required = false) String accessToken) {
 
         Long userId = parseUserId(accessToken);
@@ -169,7 +173,8 @@ public class AuthController {
         }
         // 연동 대상 userId 를 state 에 실어 둔다. state 는 콜백에서 서버가 심은 oauthState 쿠키와
         // 통째로 대조되므로(위조 불가), 콜백은 이 값을 "연동을 시작한 유저"로 신뢰할 수 있다.
-        String state = UUID.randomUUID() + "." + provider + ".link." + userId;
+        String state = UUID.randomUUID() + "." + provider + ".link." + userId
+                + (mergeWith != null ? ".merge." + mergeWith : "");
         return ResponseEntity.status(HttpStatus.FOUND)
                 .header(HttpHeaders.SET_COOKIE, oauthWebSupport.stateCookie(state).toString())
                 .header(HttpHeaders.LOCATION, oauthWebSupport.authorizeUrl(provider, state))
@@ -211,15 +216,25 @@ public class AuthController {
             if (stateUserId == null || !stateUserId.equals(currentUserId)) {
                 return redirect(oauthWebSupport.front("/mypage?linkError=auth"), expiredState);
             }
+            // state: "<nonce>.<provider>.link.<userId>" 뒤에 병합 확인 왕복이면 ".merge.<secondaryUserId>" 가 더 붙는다.
+            Long mergeSecondaryUserId = parts.length > 5 && "merge".equals(parts[4]) ? toUserId(parts[5]) : null;
             try {
+                if (mergeSecondaryUserId != null) {
+                    myPageService.confirmMerge(stateUserId, mergeSecondaryUserId, provider, code);
+                    return redirect(oauthWebSupport.front("/mypage?merged=1"), expiredState);
+                }
                 myPageService.linkOauth(stateUserId, provider, code);
                 return redirect(oauthWebSupport.front("/mypage?linked=1"), expiredState);
             } catch (OauthAlreadyLinkedException e) {
                 return redirect(oauthWebSupport.front("/mypage?linkError=already"), expiredState);
             } catch (OauthLinkedToOtherAccountException e) {
-                return redirect(oauthWebSupport.front("/mypage?linkError=other_account"), expiredState);
+                return redirect(oauthWebSupport.front(
+                        "/mypage?linkError=other_account&conflictUserId=" + e.getConflictingUserId()
+                                + "&provider=" + provider), expiredState);
+            } catch (ManagerGroupExistsException e) {
+                return redirect(oauthWebSupport.front("/mypage?linkError=manager_account"), expiredState);
             } catch (RuntimeException e) {
-                log.warn("[OAuth] 연동 실패: {}", e.getMessage());
+                log.warn("[OAuth] 연동/병합 실패: {}", e.getMessage());
                 return redirect(oauthWebSupport.front("/mypage?linkError=1"), expiredState);
             }
         }

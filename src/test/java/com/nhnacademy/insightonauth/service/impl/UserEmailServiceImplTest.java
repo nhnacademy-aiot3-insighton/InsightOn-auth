@@ -1,7 +1,6 @@
 package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
-import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.exception.*;
@@ -14,6 +13,7 @@ import com.nhnacademy.insightonauth.exception.external.*;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.redis.ResendCounter;
 import com.nhnacademy.insightonauth.repository.UserRepository;
+import com.nhnacademy.insightonauth.service.EmailVerificationService;
 import com.nhnacademy.insightonauth.service.TokenService;
 import com.nhnacademy.insightonauth.service.UserCredentialService;
 import com.nhnacademy.insightonauth.service.UserManagementService;
@@ -36,7 +36,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class UserEmailServiceImplTest {
 
-    @Mock private EmailService emailService;
+    @Mock private EmailVerificationService emailVerificationService;
     @Mock private RedisService redisService;
     @Mock private ResendCounter resendCounter;
     @Mock private TokenService tokenService;
@@ -96,7 +96,7 @@ class UserEmailServiceImplTest {
 
         userEmailService.emailVerifyRequest("test@test.com");
 
-        verify(emailService).sendVerificationCode("test@test.com");
+        verify(emailVerificationService).sendVerificationCode("test@test.com");
     }
 
     // ---------- reactivateRequest ----------
@@ -109,7 +109,7 @@ class UserEmailServiceImplTest {
 
         assertThatThrownBy(() -> userEmailService.reactivateRequest("test@test.com"))
                 .isInstanceOf(VerificationResendTooSoonException.class);
-        verify(emailService, never()).sendReactiveVerificationCode(anyString());
+        verify(emailVerificationService, never()).sendReactiveVerificationCode(anyString());
     }
 
     @Test
@@ -122,7 +122,7 @@ class UserEmailServiceImplTest {
 
         userEmailService.reactivateRequest("test@test.com");
 
-        verify(emailService, never()).sendReactiveVerificationCode(anyString());
+        verify(emailVerificationService, never()).sendReactiveVerificationCode(anyString());
     }
 
     @Test
@@ -135,7 +135,7 @@ class UserEmailServiceImplTest {
 
         userEmailService.reactivateRequest("test@test.com");
 
-        verify(emailService).sendReactiveVerificationCode("test@test.com");
+        verify(emailVerificationService).sendReactiveVerificationCode("test@test.com");
     }
 
     // ---------- reactivateConfirm ----------
@@ -147,7 +147,7 @@ class UserEmailServiceImplTest {
 
         assertThatThrownBy(() -> userEmailService.reactivateConfirm("test@test.com", "code"))
                 .isInstanceOf(UserNotFoundException.class);
-        verify(emailService).emailReactiveVerifyCheck("test@test.com", "code");
+        verify(emailVerificationService).emailReactiveVerifyCheck("test@test.com", "code");
     }
 
     @Test
@@ -175,7 +175,7 @@ class UserEmailServiceImplTest {
 
         userEmailService.passwordResetRequest("test@test.com");
 
-        verify(emailService, never()).sendPasswordResetPath(anyString());
+        verify(emailVerificationService, never()).sendPasswordResetPath(anyString());
     }
 
     @Test
@@ -189,7 +189,7 @@ class UserEmailServiceImplTest {
 
         userEmailService.passwordResetRequest("test@test.com");
 
-        verify(emailService, never()).sendPasswordResetPath(anyString());
+        verify(emailVerificationService, never()).sendPasswordResetPath(anyString());
     }
 
     @Test
@@ -202,7 +202,7 @@ class UserEmailServiceImplTest {
 
         userEmailService.passwordResetRequest("test@test.com");
 
-        verify(emailService).sendPasswordResetPath("test@test.com");
+        verify(emailVerificationService).sendPasswordResetPath("test@test.com");
     }
 
     // ---------- passwordResetConfirm ----------
@@ -210,7 +210,7 @@ class UserEmailServiceImplTest {
     @Test
     @DisplayName("passwordResetConfirm - 토큰 검증 후 비밀번호 변경")
     void passwordResetConfirm() {
-        when(emailService.emailTokenVerify("token")).thenReturn("test@test.com");
+        when(emailVerificationService.emailTokenVerify("token")).thenReturn("test@test.com");
         when(userManagementService.findByEmail("test@test.com")).thenReturn(user);
 
         userEmailService.passwordResetConfirm("token", "newPw");

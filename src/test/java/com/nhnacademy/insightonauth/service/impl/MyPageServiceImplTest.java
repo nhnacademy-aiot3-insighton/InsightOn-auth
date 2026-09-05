@@ -201,6 +201,18 @@ class MyPageServiceImplTest {
     }
 
     @Test
+    @DisplayName("mergeAccount - primary가 이미 같은 provider 연동돼 있으면 예외 (DB 유니크 위반 대신 명확히 차단)")
+    void mergeAccount_primaryAlreadyHasProvider() {
+        when(userManagementService.findById(1L)).thenReturn(user);
+        when(oauthService.hasProviderLinked(user, "google")).thenReturn(true);
+
+        assertThatThrownBy(() -> myPageService.mergeAccount(1L, 2L, "google", "pid-1"))
+                .isInstanceOf(OauthAlreadyLinkedException.class);
+
+        verify(oauthService, never()).findByProviderAndProviderUserId(anyString(), anyString());
+    }
+
+    @Test
     @DisplayName("mergeAccount - 연동 정보가 없으면 예외")
     void mergeAccount_oauthNotFound() {
         when(userManagementService.findById(1L)).thenReturn(user);
@@ -231,10 +243,43 @@ class MyPageServiceImplTest {
         Oauth oauth = new Oauth(secondary, "google", "pid-1");
         when(userManagementService.findById(1L)).thenReturn(user);
         when(oauthService.findByProviderAndProviderUserId("google", "pid-1")).thenReturn(Optional.of(oauth));
+        when(coreService.isGroupManager(2L)).thenReturn(false);
 
         myPageService.mergeAccount(1L, 2L, "google", "pid-1");
 
         assertThat(oauth.getUser()).isEqualTo(user);
         verify(userManagementService).deleteUser(2L);
+    }
+
+    @Test
+    @DisplayName("mergeAccount - secondary 가 그룹 관리자면 예외 (삭제 차단)")
+    void mergeAccount_secondaryIsGroupManager() {
+        User secondary = new User("s@test.com", "s", "01055556666");
+        ReflectionTestUtils.setField(secondary, "userId", 2L);
+        Oauth oauth = new Oauth(secondary, "google", "pid-1");
+        when(userManagementService.findById(1L)).thenReturn(user);
+        when(oauthService.findByProviderAndProviderUserId("google", "pid-1")).thenReturn(Optional.of(oauth));
+        when(coreService.isGroupManager(2L)).thenReturn(true);
+
+        assertThatThrownBy(() -> myPageService.mergeAccount(1L, 2L, "google", "pid-1"))
+                .isInstanceOf(ManagerGroupExistsException.class);
+
+        verify(userManagementService, never()).deleteUser(anyLong());
+    }
+
+    @Test
+    @DisplayName("mergeAccount - core 서비스 장애 시 병합 차단 (fail-closed)")
+    void mergeAccount_coreUnavailable() {
+        User secondary = new User("s@test.com", "s", "01055556666");
+        ReflectionTestUtils.setField(secondary, "userId", 2L);
+        Oauth oauth = new Oauth(secondary, "google", "pid-1");
+        when(userManagementService.findById(1L)).thenReturn(user);
+        when(oauthService.findByProviderAndProviderUserId("google", "pid-1")).thenReturn(Optional.of(oauth));
+        when(coreService.isGroupManager(2L)).thenThrow(new RuntimeException("core down"));
+
+        assertThatThrownBy(() -> myPageService.mergeAccount(1L, 2L, "google", "pid-1"))
+                .isInstanceOf(CoreServiceUnavailableException.class);
+
+        verify(userManagementService, never()).deleteUser(anyLong());
     }
 }
