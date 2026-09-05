@@ -1,7 +1,7 @@
 package com.nhnacademy.insightonauth.controller;
 
 import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
-import com.nhnacademy.insightonauth.dto.mypage.RoleResponse;
+import com.nhnacademy.insightonauth.dto.mypage.MyRoleResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.User;
@@ -128,7 +128,7 @@ class MypageControllerTest {
     @Test
     @DisplayName("GET /me/roles — 200, 권한 목록")
     void findMyRoles() throws Exception {
-        when(myPageService.findMyRoles(1L)).thenReturn(List.of(new RoleResponse(Role.MEMBER)));
+        when(myPageService.findMyRoles(1L)).thenReturn(List.of(new MyRoleResponse(Role.MEMBER)));
 
         mvc.perform(get("/api/v1/users/me/roles").header("X-User-Id", "1"))
                 .andExpect(status().isOk())

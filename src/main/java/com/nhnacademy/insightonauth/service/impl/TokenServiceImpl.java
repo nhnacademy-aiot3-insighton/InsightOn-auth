@@ -34,7 +34,7 @@ public class TokenServiceImpl implements TokenService {
         // 직전 access jti 를 원자적으로 블랙리스트에 올리고, createRefreshToken 이
         // refresh:{userId} 를 덮어쓴다. 밀려난 세션은 다음 요청에서 401 → refresh 실패로 로그아웃.
         String accessToken = jwtProvider.createAccessToken(user.getUserId(), roles, user.getUserName());
-        String refreshToken = jwtProvider.createRefreshToken(user.getUserId(), roles);
+        String refreshToken = jwtProvider.createRefreshToken(user.getUserId());
 
         redisService.delete(RedisKey.LOGIN_LOCK.getPrefix() + email);
         redisService.delete(RedisKey.LOGIN_FAIL.getPrefix() + email);

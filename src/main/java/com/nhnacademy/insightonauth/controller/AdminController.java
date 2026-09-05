@@ -16,7 +16,6 @@ import com.nhnacademy.insightonauth.exception.user.InvalidUserStatusValueExcepti
 import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.service.AdminUserService;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
-import com.nhnacademy.insightonauth.service.UserManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -33,7 +32,6 @@ public class AdminController {
 
     private final AdminUserService adminUserService;
     private final UserAuthenticationService userAuthenticationService;
-    private final UserManagementService userManagementService;
     private final JwtProvider jwtProvider;
     private final LoginResponder loginResponder;
 

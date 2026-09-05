@@ -33,7 +33,7 @@ public class UserRole {
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
-    public UserRole(User user, Role role) {
+    public UserRole(@NonNull User user, Role role) {
         this.user = user;
         this.role = role;
         this.createdAt = OffsetDateTime.now(ZoneOffset.UTC);

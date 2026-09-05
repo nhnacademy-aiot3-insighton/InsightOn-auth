@@ -4,6 +4,8 @@ import com.nhnacademy.insightonauth.exception.BusinessException;
 import com.nhnacademy.insightonauth.exception.ErrorResponse;
 import com.nhnacademy.insightonauth.exception.OauthConflictResponse;
 import com.nhnacademy.insightonauth.exception.oauth.OauthLinkedToOtherAccountException;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -40,6 +42,17 @@ public class GlobalExceptionHandler {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(FieldError::getDefaultMessage)
+                .orElse("잘못된 요청입니다.");
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(), message));
+    }
+
+    // 파라미터 단위 검증 실패 (@Validated + @PathVariable/@RequestParam)
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException e) {
+        String message = e.getConstraintViolations().stream()
+                .findFirst()
+                .map(ConstraintViolation::getMessage)
                 .orElse("잘못된 요청입니다.");
         return ResponseEntity.badRequest()
                 .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(), message));

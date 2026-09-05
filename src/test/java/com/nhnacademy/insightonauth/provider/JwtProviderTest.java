@@ -61,7 +61,7 @@ class JwtProviderTest {
     void setUp() throws Exception {
         redisService = mock(RedisService.class);
         jwtProvider = new JwtProvider(privateKeyB64, publicKeyB64, "test-key-v1",
-                Duration.ofMinutes(15), Duration.ofDays(15), null, redisService);
+                Duration.ofMinutes(15), Duration.ofDays(15), redisService);
     }
 
     // ---------- 생성 / 파싱 ----------
@@ -112,7 +112,7 @@ class JwtProviderTest {
     @Test
     @DisplayName("createRefreshToken — 토큰 발급 + Redis에 jti 저장")
     void createRefreshToken() {
-        String token = jwtProvider.createRefreshToken(1L, List.of("MEMBER"));
+        String token = jwtProvider.createRefreshToken(1L);
 
         Claims c = jwtProvider.parse(token);
         assertThat(c.getSubject()).isEqualTo("1");
@@ -132,7 +132,7 @@ class JwtProviderTest {
     @DisplayName("parse — 만료된 토큰이면 JwtException")
     void parse_expired() throws Exception {
         JwtProvider shortLived = new JwtProvider(privateKeyB64, publicKeyB64, "test-key-v1",
-                Duration.ofSeconds(-1), Duration.ofDays(1), null, redisService);
+                Duration.ofSeconds(-1), Duration.ofDays(1), redisService);
         String token = shortLived.createAccessToken(1L, List.of("MEMBER"), "n");
 
         assertThatThrownBy(() -> jwtProvider.parse(token)).isInstanceOf(JwtException.class);
@@ -149,7 +149,7 @@ class JwtProviderTest {
                         + Base64.getMimeEncoder().encodeToString(other.getPrivate().getEncoded())
                         + "\n-----END PRIVATE KEY-----\n").getBytes());
         JwtProvider foreign = new JwtProvider(otherPrivB64, publicKeyB64, "test-key-v1",
-                Duration.ofMinutes(15), Duration.ofDays(15), null, redisService);
+                Duration.ofMinutes(15), Duration.ofDays(15), redisService);
         String token = foreign.createAccessToken(1L, List.of("MEMBER"), "n");
 
         assertThatThrownBy(() -> jwtProvider.parse(token)).isInstanceOf(JwtException.class);
@@ -160,7 +160,7 @@ class JwtProviderTest {
     @Test
     @DisplayName("validateRefreshToken — 정상이면 예외 없음")
     void validateRefreshToken_ok() {
-        String token = jwtProvider.createRefreshToken(1L, List.of("MEMBER"));
+        String token = jwtProvider.createRefreshToken(1L);
         String jti = jwtProvider.parse(token).getId();
         when(redisService.get("refresh:1")).thenReturn(jti);
 
@@ -177,7 +177,7 @@ class JwtProviderTest {
     @Test
     @DisplayName("validateRefreshToken — 다른 userId의 토큰이면 InvalidRefreshTokenException")
     void validateRefreshToken_subjectMismatch() {
-        String token = jwtProvider.createRefreshToken(1L, List.of("MEMBER"));
+        String token = jwtProvider.createRefreshToken(1L);
 
         assertThatThrownBy(() -> jwtProvider.validateRefreshToken(2L, token))
                 .isInstanceOf(InvalidRefreshTokenException.class);
@@ -186,7 +186,7 @@ class JwtProviderTest {
     @Test
     @DisplayName("validateRefreshToken — Redis에 jti 없으면 RefreshTokenNotFoundException")
     void validateRefreshToken_noRedisEntry() {
-        String token = jwtProvider.createRefreshToken(1L, List.of("MEMBER"));
+        String token = jwtProvider.createRefreshToken(1L);
         when(redisService.get("refresh:1")).thenReturn(null);
 
         assertThatThrownBy(() -> jwtProvider.validateRefreshToken(1L, token))
@@ -196,7 +196,7 @@ class JwtProviderTest {
     @Test
     @DisplayName("validateRefreshToken — Redis jti가 토큰 jti와 다르면 InvalidRefreshTokenException")
     void validateRefreshToken_jtiRotated() {
-        String token = jwtProvider.createRefreshToken(1L, List.of("MEMBER"));
+        String token = jwtProvider.createRefreshToken(1L);
         when(redisService.get("refresh:1")).thenReturn("rotated-jti");
 
         assertThatThrownBy(() -> jwtProvider.validateRefreshToken(1L, token))
@@ -222,7 +222,7 @@ class JwtProviderTest {
     @Test
     @DisplayName("extractRoles — roles 클레임이 없으면 빈 리스트 (refresh 토큰)")
     void extractRoles_absent() {
-        String token = jwtProvider.createRefreshToken(1L, List.of("MEMBER"));
+        String token = jwtProvider.createRefreshToken(1L);
         assertThat(jwtProvider.extractRoles(token)).isEmpty();
     }
 
