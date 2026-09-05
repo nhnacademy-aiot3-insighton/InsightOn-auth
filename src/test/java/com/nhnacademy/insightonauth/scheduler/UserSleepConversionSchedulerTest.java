@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -113,5 +114,17 @@ class UserSleepConversionSchedulerTest {
         scheduler.convertInactiveUsersToSleep();
 
         verify(lock, never()).unlock();
+    }
+
+    @Test
+    @DisplayName("unlock 시 소유권을 잃었으면(IllegalMonitorStateException) 예외 없이 로그만 남김")
+    void convert_unlockLosesOwnershipDuringRelease() throws InterruptedException {
+        when(redissonClient.getLock(anyString())).thenReturn(lock);
+        when(lock.tryLock(0, -1, TimeUnit.SECONDS)).thenReturn(true);
+        when(lock.isHeldByCurrentThread()).thenReturn(true);
+        when(userManagementService.findInactiveUsers()).thenReturn(List.of());
+        doThrow(new IllegalMonitorStateException("이미 만료됨")).when(lock).unlock();
+
+        assertThatCode(() -> scheduler.convertInactiveUsersToSleep()).doesNotThrowAnyException();
     }
 }

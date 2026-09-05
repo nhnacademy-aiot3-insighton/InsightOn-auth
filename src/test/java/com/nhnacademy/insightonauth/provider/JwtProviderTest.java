@@ -64,6 +64,35 @@ class JwtProviderTest {
                 Duration.ofMinutes(15), Duration.ofDays(15), redisService);
     }
 
+    // ---------- 키 로딩 실패 ----------
+
+    private static String garbageKeyB64(String beginMarker, String endMarker) {
+        String pem = beginMarker + "\n"
+                + Base64.getMimeEncoder().encodeToString("not-a-real-key-content".getBytes())
+                + "\n" + endMarker + "\n";
+        return Base64.getEncoder().encodeToString(pem.getBytes());
+    }
+
+    @Test
+    @DisplayName("private key 내용이 올바른 키 형식이 아니면 JwtKeyLoadException")
+    void invalidPrivateKey_throwsJwtKeyLoadException() {
+        String garbagePrivateKey = garbageKeyB64("-----BEGIN PRIVATE KEY-----", "-----END PRIVATE KEY-----");
+
+        assertThatThrownBy(() -> new JwtProvider(garbagePrivateKey, publicKeyB64, "test-key-v1",
+                Duration.ofMinutes(15), Duration.ofDays(15), redisService))
+                .isInstanceOf(JwtKeyLoadException.class);
+    }
+
+    @Test
+    @DisplayName("public key 내용이 올바른 키 형식이 아니면 JwtKeyLoadException")
+    void invalidPublicKey_throwsJwtKeyLoadException() {
+        String garbagePublicKey = garbageKeyB64("-----BEGIN PUBLIC KEY-----", "-----END PUBLIC KEY-----");
+
+        assertThatThrownBy(() -> new JwtProvider(privateKeyB64, garbagePublicKey, "test-key-v1",
+                Duration.ofMinutes(15), Duration.ofDays(15), redisService))
+                .isInstanceOf(JwtKeyLoadException.class);
+    }
+
     // ---------- 생성 / 파싱 ----------
 
     @Test

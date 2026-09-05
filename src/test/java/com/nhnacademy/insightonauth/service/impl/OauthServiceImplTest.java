@@ -118,6 +118,40 @@ class OauthServiceImplTest {
     }
 
     @Test
+    @DisplayName("deleteAllByUser - repository에 위임")
+    void deleteAllByUser() {
+        oauthService.deleteAllByUser(user);
+
+        verify(oauthRepository).deleteByUser(user);
+    }
+
+    @Test
+    @DisplayName("findAllByUser - repository 조회 결과 그대로 반환")
+    void findAllByUser() {
+        Oauth g = oauth("google", "gid");
+        when(oauthRepository.findByUser(user)).thenReturn(List.of(g));
+
+        assertThat(oauthService.findAllByUser(user)).containsExactly(g);
+    }
+
+    @Test
+    @DisplayName("hasProviderLinked - repository 존재 여부 그대로 반환")
+    void hasProviderLinked() {
+        when(oauthRepository.existsByUserAndProvider(user, "google")).thenReturn(true);
+
+        assertThat(oauthService.hasProviderLinked(user, "google")).isTrue();
+    }
+
+    @Test
+    @DisplayName("findByProviderAndProviderUserId - repository 조회 결과 그대로 반환")
+    void findByProviderAndProviderUserId() {
+        Oauth g = oauth("google", "gid");
+        when(oauthRepository.findByProviderAndProviderUserId("google", "gid")).thenReturn(Optional.of(g));
+
+        assertThat(oauthService.findByProviderAndProviderUserId("google", "gid")).contains(g);
+    }
+
+    @Test
     @DisplayName("maskByUser - 모든 연동을 마스킹하고 flush")
     void maskByUser() {
         Oauth g = oauth("google", "gid");

@@ -192,6 +192,15 @@ class EmailVerificationServiceImplTest {
                 .isInstanceOf(InvalidVerificationTokenException.class);
     }
 
+    @Test
+    @DisplayName("emailTokenVerify - 저장된 값이 빈 문자열이면 예외")
+    void emailTokenVerify_blank() {
+        when(redisService.get(RedisKey.PASSWORD_RESET.getPrefix() + "bad-token")).thenReturn("");
+
+        assertThatThrownBy(() -> emailVerificationService.emailTokenVerify("bad-token"))
+                .isInstanceOf(InvalidVerificationTokenException.class);
+    }
+
     // ---------- consumePasswordResetToken ----------
 
     @Test

@@ -161,6 +161,36 @@ class UserEmailServiceImplTest {
     // ---------- passwordResetRequest ----------
 
     @Test
+    @DisplayName("passwordResetRequest - 잠겨있으면 예외")
+    void passwordResetRequest_locked() {
+        when(redisService.hasKey(contains("password-reset-resend-lock"))).thenReturn(true);
+
+        assertThatThrownBy(() -> userEmailService.passwordResetRequest("test@test.com"))
+                .isInstanceOf(PasswordResetResendLockedException.class);
+    }
+
+    @Test
+    @DisplayName("passwordResetRequest - 쿨다운이면 예외")
+    void passwordResetRequest_tooSoon() {
+        when(redisService.hasKey(anyString())).thenReturn(false);
+        when(redisService.setIfAbsent(contains("password-reset-resend-cooldown"), anyString(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> userEmailService.passwordResetRequest("test@test.com"))
+                .isInstanceOf(PasswordResetResendTooSoonException.class);
+    }
+
+    @Test
+    @DisplayName("passwordResetRequest - 이번 요청으로 잠기면 예외")
+    void passwordResetRequest_lockedNow() {
+        when(redisService.hasKey(anyString())).thenReturn(false);
+        when(redisService.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
+        when(resendCounter.increase(anyString(), anyString(), anyInt(), any())).thenReturn(true);
+
+        assertThatThrownBy(() -> userEmailService.passwordResetRequest("test@test.com"))
+                .isInstanceOf(PasswordResetResendLockedException.class);
+    }
+
+    @Test
     @DisplayName("passwordResetRequest - 계정이 없어도 예외 없이 종료 (메일만 미발송)")
     void passwordResetRequest_noAccount() {
         when(redisService.hasKey(anyString())).thenReturn(false);
