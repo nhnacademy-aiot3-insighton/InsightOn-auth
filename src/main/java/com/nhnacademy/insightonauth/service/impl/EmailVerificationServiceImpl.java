@@ -8,6 +8,7 @@ import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.service.EmailVerificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -23,6 +24,10 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
 
     private final SmtpMailSender mailSender;
     private final RedisService redisService;
+
+    // dev: http://localhost:8400, prod: https://insighton.store (OauthWebSupport와 동일한 프로퍼티)
+    @Value("${app.front-url}")
+    private String frontUrl;
 
     @Override
     public void sendVerificationCode(String email) {
@@ -43,7 +48,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
         }
 
         String uuid = UUID.randomUUID().toString();
-        String path = "https://insighton.store/password/reset?token=" + uuid;
+        String path = frontUrl + "/password/reset?token=" + uuid;
 
         redisService.set(RedisKey.PASSWORD_RESET.getPrefix() + uuid, email, Duration.ofMinutes(10));
         redisService.set(RedisKey.PASSWORD_RESET_BY_EMAIL.getPrefix() + email, uuid, Duration.ofMinutes(10));
@@ -97,21 +102,26 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
 
     @Override
     public String emailTokenVerify(String token) {
+        // 조회만 하고 지우지 않는다 — 여기서 지워버리면 뒤이은 비밀번호 변경이
+        // (동일 비밀번호 등으로) 실패했을 때 토큰이 이미 소모돼 재시도가 불가능해진다.
         String savedEmail = redisService.get(RedisKey.PASSWORD_RESET.getPrefix() + token);
         if (savedEmail == null || savedEmail.isBlank()) {
             throw new InvalidVerificationTokenException("인증 토큰이 올바르지 않거나 만료되었습니다.");
         }
 
-        // 정방향 토큰은 삭제 (이 token은 사용됨)
+        return savedEmail;
+    }
+
+    @Override
+    public void consumePasswordResetToken(String token, String email) {
+        // 비밀번호 변경이 실제로 성공한 뒤에만 호출 — 정방향 토큰 삭제
         redisService.delete(RedisKey.PASSWORD_RESET.getPrefix() + token);
 
         // 역방향 키는 "아직 이 token을 가리킬 때만" 삭제 — 다르면 그 사이 새 토큰이 발급된 것이므로 최신 역방향은 건드리지 않음
-        String currentUuid = redisService.get(RedisKey.PASSWORD_RESET_BY_EMAIL.getPrefix() + savedEmail);
+        String currentUuid = redisService.get(RedisKey.PASSWORD_RESET_BY_EMAIL.getPrefix() + email);
         if (token.equals(currentUuid)) {
-            redisService.delete(RedisKey.PASSWORD_RESET_BY_EMAIL.getPrefix() + savedEmail);
+            redisService.delete(RedisKey.PASSWORD_RESET_BY_EMAIL.getPrefix() + email);
         }
-
-        return savedEmail;
     }
 
     @Override
