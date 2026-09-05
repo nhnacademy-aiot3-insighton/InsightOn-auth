@@ -6,6 +6,6 @@ public final class PhoneNumberUtil {
     }
 
     public static String normalize(String phoneNumber) {
-        return phoneNumber == null ? null : phoneNumber.replaceAll("[^0-9]", "");
+        return phoneNumber == null ? null : phoneNumber.replaceAll("\\D", "");
     }
 }

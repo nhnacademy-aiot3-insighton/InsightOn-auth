@@ -34,10 +34,11 @@ class OauthWebSupportTest {
     void authorizeUrl_google() {
         String url = oauthWebSupport.authorizeUrl("google", "nonce.google");
 
-        assertThat(url).startsWith("https://accounts.google.com/o/oauth2/v2/auth");
-        assertThat(url).contains("client_id=google-client-id");
-        assertThat(url).contains("state=nonce.google");
-        assertThat(url).contains("response_type=code");
+        assertThat(url)
+                .startsWith("https://accounts.google.com/o/oauth2/v2/auth")
+                .contains("client_id=google-client-id")
+                .contains("state=nonce.google")
+                .contains("response_type=code");
     }
 
     @Test
@@ -45,8 +46,9 @@ class OauthWebSupportTest {
     void authorizeUrl_github() {
         String url = oauthWebSupport.authorizeUrl("github", "nonce.github");
 
-        assertThat(url).startsWith("https://github.com/login/oauth/authorize");
-        assertThat(url).contains("client_id=github-client-id");
+        assertThat(url)
+                .startsWith("https://github.com/login/oauth/authorize")
+                .contains("client_id=github-client-id");
     }
 
     @Test

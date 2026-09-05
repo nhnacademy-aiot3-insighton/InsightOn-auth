@@ -100,7 +100,7 @@ class EmailVerificationServiceImplTest {
         assertThat(token).isNotBlank();
         verify(redisService).delete(RedisKey.VERIFY_FAIL.getPrefix() + "test@test.com");
         verify(redisService).delete(RedisKey.VERIFY.getPrefix() + "test@test.com");
-        verify(redisService).set(eq(RedisKey.VERIFIED.getPrefix() + "test@test.com"), eq(token), eq(Duration.ofMinutes(15)));
+        verify(redisService).set(RedisKey.VERIFIED.getPrefix() + "test@test.com", token, Duration.ofMinutes(15));
     }
 
     @Test

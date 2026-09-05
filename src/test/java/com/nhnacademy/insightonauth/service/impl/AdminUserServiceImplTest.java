@@ -156,14 +156,18 @@ class AdminUserServiceImplTest {
     @Test
     @DisplayName("updateUserRoles - 빈 목록이면 예외")
     void updateUserRoles_empty() {
-        assertThatThrownBy(() -> adminUserService.updateUserRoles(1L, List.of()))
+        List<Role> emptyRoles = List.of();
+
+        assertThatThrownBy(() -> adminUserService.updateUserRoles(1L, emptyRoles))
                 .isInstanceOf(InvalidUserRoleException.class);
     }
 
     @Test
     @DisplayName("updateUserRoles - ADMIN 은 다른 권한과 함께 지정 불가")
     void updateUserRoles_adminNotCombinable() {
-        assertThatThrownBy(() -> adminUserService.updateUserRoles(1L, List.of(Role.MEMBER, Role.ADMIN)))
+        List<Role> combinedRoles = List.of(Role.MEMBER, Role.ADMIN);
+
+        assertThatThrownBy(() -> adminUserService.updateUserRoles(1L, combinedRoles))
                 .isInstanceOf(InvalidUserRoleException.class);
     }
 

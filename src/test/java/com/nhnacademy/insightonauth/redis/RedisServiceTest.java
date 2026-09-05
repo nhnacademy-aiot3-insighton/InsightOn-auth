@@ -148,8 +148,9 @@ class RedisServiceTest {
     void increment_null() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.increment("key")).thenReturn(null);
+        Duration ttl = Duration.ofMinutes(5);
 
-        assertThatThrownBy(() -> redisService.increment("key", Duration.ofMinutes(5)))
+        assertThatThrownBy(() -> redisService.increment("key", ttl))
                 .isInstanceOf(RedisOperationException.class);
     }
 }
