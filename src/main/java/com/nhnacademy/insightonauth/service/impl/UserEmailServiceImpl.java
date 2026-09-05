@@ -1,7 +1,6 @@
 package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
-import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.exception.*;
@@ -15,6 +14,7 @@ import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.redis.ResendCounter;
 import com.nhnacademy.insightonauth.repository.UserRepository;
+import com.nhnacademy.insightonauth.service.EmailVerificationService;
 import com.nhnacademy.insightonauth.service.TokenService;
 import com.nhnacademy.insightonauth.service.UserCredentialService;
 import com.nhnacademy.insightonauth.service.UserEmailService;
@@ -32,7 +32,7 @@ import java.time.ZoneOffset;
 @RequiredArgsConstructor
 public class UserEmailServiceImpl implements UserEmailService {
 
-    private final EmailService emailService;
+    private final EmailVerificationService emailVerificationService;
     private final RedisService redisService;
     private final ResendCounter resendCounter;
     private final TokenService tokenService;
@@ -69,13 +69,13 @@ public class UserEmailServiceImpl implements UserEmailService {
         }
 
         // 4. 발송
-        emailService.sendVerificationCode(email);
+        emailVerificationService.sendVerificationCode(email);
 
     }
 
     @Override
     public String emailVerifyConfirm(String email, String code) {
-        return emailService.emailCodeVerify(email, code);
+        return emailVerificationService.emailCodeVerify(email, code);
     }
 
     @Override
@@ -108,12 +108,12 @@ public class UserEmailServiceImpl implements UserEmailService {
 
         // 4. 실제 메일 발송은 복구 가능한 계정일 때만 (없어도 예외 안 던짐 — 계정 존재 노출 방지)
         userManagementService.findReactivatableByEmail(email)
-                .ifPresent(user -> emailService.sendReactiveVerificationCode(email));
+                .ifPresent(user -> emailVerificationService.sendReactiveVerificationCode(email));
     }
 
     @Override
     public UserLoginResult reactivateConfirm(String email, String code) {
-        emailService.emailReactiveVerifyCheck(email, code);
+        emailVerificationService.emailReactiveVerifyCheck(email, code);
 
         User user = userManagementService.findReactivatableByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
@@ -156,13 +156,13 @@ public class UserEmailServiceImpl implements UserEmailService {
             if (user.getStatus() == Status.WITHDRAW) {
                 return;   // 탈퇴 계정: 메일만 안 보냄 (rate limit은 이미 걸림)
             }
-            emailService.sendPasswordResetPath(email);
+            emailVerificationService.sendPasswordResetPath(email);
         });
     }
 
     @Override
     public void passwordResetConfirm(String token, String newPassword) {
-        String email = emailService.emailTokenVerify(token);
+        String email = emailVerificationService.emailTokenVerify(token);
 
         User user = userManagementService.findByEmail(email);
 

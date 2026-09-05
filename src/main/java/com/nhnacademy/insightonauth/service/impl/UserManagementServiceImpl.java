@@ -1,7 +1,6 @@
 package com.nhnacademy.insightonauth.service.impl;
 
 import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
-import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
@@ -37,7 +36,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     private final UserCredentialService userCredentialService;
     private final UserRoleService userRoleService;
     private final OauthService oauthService;
-    private final EmailService emailService;
+    private final EmailVerificationService emailVerificationService;
     private final RedisService redisService;
     private final TokenBlacklistService tokenBlacklistService;
     private final TokenService tokenService;
@@ -48,7 +47,7 @@ public class UserManagementServiceImpl implements UserManagementService {
         if (userRepository.existsByEmail(email)) {
             throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
         }
-        emailService.emailVerifyCheck(email, verificationToken);
+        emailVerificationService.emailVerifyCheck(email, verificationToken);
 
         String normalized = PhoneNumberUtil.normalize(phoneNumber);
         if (normalized != null && userRepository.existsByPhoneNumber(normalized)) {

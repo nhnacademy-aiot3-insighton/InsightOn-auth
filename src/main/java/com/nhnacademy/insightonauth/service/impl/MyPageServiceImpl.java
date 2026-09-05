@@ -131,6 +131,13 @@ public class MyPageServiceImpl implements MyPageService {
 
         User primaryUser = userManagementService.findById(primaryUserId);
 
+        // confirmMerge는 linkOauth의 사전 검사를 거치지 않고 바로 여기로 오므로, primary가 이미
+        // 같은 provider를 갖고 있으면 재연결 시 DB 유니크 제약 위반(정제 안 된 예외)이 아니라
+        // 여기서 명확히 막는다.
+        if (oauthService.hasProviderLinked(primaryUser, provider)) {
+            throw new OauthAlreadyLinkedException("이미 " + provider + " 계정이 연동되어 있습니다.");
+        }
+
         // 2차 확인 - secondaryUser가 정말 이 provider/providerUserId를 갖고 있는지 검증
         Oauth secondaryOauth = oauthService.findByProviderAndProviderUserId(provider, providerUserId)
                 .orElseThrow(() -> new OauthNotFoundException("연동 정보를 찾을 수 없습니다."));
@@ -139,10 +146,33 @@ public class MyPageServiceImpl implements MyPageService {
             throw new InvalidMergeRequestException("병합 요청이 유효하지 않습니다.");
         }
 
+        // secondaryUser 삭제 직전 재확인 — 그룹 관리자면 병합(=계정 삭제)로 탈퇴 제한을 우회할 수 없다
+        boolean isGroupManager;
+        try {
+            isGroupManager = coreService.isGroupManager(secondaryUserId);
+        } catch (Exception e) {
+            throw new CoreServiceUnavailableException(
+                    "일시적으로 그룹 정보를 확인할 수 없어 병합이 제한됩니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        if (isGroupManager) {
+            throw new ManagerGroupExistsException("그룹 관리자 역할이 있는 계정은 병합할 수 없습니다.");
+        }
+
         // Oauth를 primaryUser로 재연결
         secondaryOauth.reassignUser(primaryUser);
 
         // secondaryUser(연동 전에 사용하던 계정 삭제) 삭제
         userManagementService.deleteUser(secondaryUserId);
+    }
+
+    // 병합 확인 시 provider 재인증 왕복으로 받은 code — 이 code로 방금 교환한 providerUserId만 신뢰한다
+    // (클라이언트가 주장하는 providerUserId를 그대로 믿지 않기 위함)
+    @Override
+    public void confirmMerge(Long primaryUserId, Long secondaryUserId, String provider, String code) {
+        OauthClient oauthClient = oauthClientResolver.resolve(provider);
+        OauthUserInfo userInfo = oauthClient.getUserInfo(code);
+
+        mergeAccount(primaryUserId, secondaryUserId, provider, userInfo.providerId());
     }
 }
