@@ -13,8 +13,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.Duration;
@@ -39,7 +41,7 @@ public class JwtProvider {
             @Value("${jwt.key-id}") String keyId,
             @Value("${jwt.access-token-validity}") Duration accessValidity,
             @Value("${jwt.refresh-token-validity}") Duration refreshValidity,
-            RedisService redisService) throws Exception {
+            RedisService redisService) {
         this.privateKey = loadPrivateKey(privateKeyBase64);
         this.publicKey = loadPublicKey(publicKeyBase64);
         this.keyId = keyId;
@@ -125,7 +127,7 @@ public class JwtProvider {
                 .getPayload();
     }
 
-    private PrivateKey loadPrivateKey(String base64Key) throws Exception {
+    private PrivateKey loadPrivateKey(String base64Key) {
         String pemText = new String(Base64.getDecoder().decode(base64Key));
 
         String content = pemText
@@ -133,11 +135,15 @@ public class JwtProvider {
                 .replace("-----END PRIVATE KEY-----", "")
                 .replaceAll("\\s", "");
         byte[] decoded = Base64.getDecoder().decode(content);
-        return KeyFactory.getInstance("RSA")
-                .generatePrivate(new PKCS8EncodedKeySpec(decoded));
+        try {
+            return KeyFactory.getInstance("RSA")
+                    .generatePrivate(new PKCS8EncodedKeySpec(decoded));
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+            throw new JwtKeyLoadException("JWT private key 로딩에 실패했습니다.", e);
+        }
     }
 
-    private PublicKey loadPublicKey(String base64Key) throws Exception {
+    private PublicKey loadPublicKey(String base64Key) {
         String pemText = new String(Base64.getDecoder().decode(base64Key));
 
         String content = pemText
@@ -145,8 +151,12 @@ public class JwtProvider {
                 .replace("-----END PUBLIC KEY-----", "")
                 .replaceAll("\\s", "");
         byte[] decoded = Base64.getDecoder().decode(content);
-        return KeyFactory.getInstance("RSA")
-                .generatePublic(new X509EncodedKeySpec(decoded));
+        try {
+            return KeyFactory.getInstance("RSA")
+                    .generatePublic(new X509EncodedKeySpec(decoded));
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+            throw new JwtKeyLoadException("JWT public key 로딩에 실패했습니다.", e);
+        }
     }
 
     /**
