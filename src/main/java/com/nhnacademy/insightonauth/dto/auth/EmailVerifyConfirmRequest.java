@@ -16,7 +16,7 @@ public record EmailVerifyConfirmRequest(
         String email,
 
         @NotBlank(message = "코드를 입력해주세요.")
-        @Pattern(regexp = "^[0-9]{6}$", message = "코드는 숫자 6자리여야 합니다.")
+        @Pattern(regexp = "^\\d{6}$", message = "코드는 숫자 6자리여야 합니다.")
         String code
 ) {
 }

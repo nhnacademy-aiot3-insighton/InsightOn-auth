@@ -155,6 +155,19 @@ class AdminControllerTest {
     }
 
     @Test
+    @DisplayName("GET /roles — 200, 지정 가능한 권한 목록")
+    void roles() throws Exception {
+        when(adminUserService.findAssignableRoles()).thenReturn(List.of(
+                com.nhnacademy.insightonauth.dto.admin.RoleResponse.from(Role.ADMIN),
+                com.nhnacademy.insightonauth.dto.admin.RoleResponse.from(Role.MEMBER)));
+
+        mvc.perform(get("/api/v1/admin/roles"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("ADMIN"))
+                .andExpect(jsonPath("$[1].name").value("MEMBER"));
+    }
+
+    @Test
     @DisplayName("POST /users/{userId}/block — 204")
     void block() throws Exception {
         mvc.perform(post("/api/v1/admin/users/1/block"))

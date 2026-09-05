@@ -47,9 +47,7 @@ public class UserRoleServiceImpl implements UserRoleService {
     @Override
     @Transactional(readOnly = true)
     public List<UserRole> findByUser(User user) {
-        List<UserRole> userRoleList = userRoleRepository.findByUser(user);
-
-        return userRoleList;
+        return userRoleRepository.findByUser(user);
     }
 
     @Override

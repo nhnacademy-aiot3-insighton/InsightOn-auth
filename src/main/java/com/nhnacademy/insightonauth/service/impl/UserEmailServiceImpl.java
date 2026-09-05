@@ -3,13 +3,8 @@ package com.nhnacademy.insightonauth.service.impl;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
-import com.nhnacademy.insightonauth.exception.*;
-import com.nhnacademy.insightonauth.exception.auth.*;
 import com.nhnacademy.insightonauth.exception.user.*;
 import com.nhnacademy.insightonauth.exception.email.*;
-import com.nhnacademy.insightonauth.exception.signup.*;
-import com.nhnacademy.insightonauth.exception.oauth.*;
-import com.nhnacademy.insightonauth.exception.external.*;
 import com.nhnacademy.insightonauth.redis.RedisKey;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.redis.ResendCounter;
@@ -32,6 +27,9 @@ import java.time.ZoneOffset;
 @RequiredArgsConstructor
 public class UserEmailServiceImpl implements UserEmailService {
 
+    private static final String RESEND_LOCKED_MESSAGE = "재전송 시도가 초과되어 잠겼습니다.";
+    private static final String RESEND_TOO_SOON_MESSAGE = "잠시 후 다시 시도해 주세요.";
+
     private final EmailVerificationService emailVerificationService;
     private final RedisService redisService;
     private final ResendCounter resendCounter;
@@ -44,7 +42,7 @@ public class UserEmailServiceImpl implements UserEmailService {
     public void emailVerifyRequest(String email) {
         // 1. 재전송 잠금 체크 (더 강한 제한 먼저)
         if (redisService.hasKey(RedisKey.VERIFY_RESEND_LOCK.getPrefix() + email)) {
-            throw new VerificationResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+            throw new VerificationResendLockedException(RESEND_LOCKED_MESSAGE);
         }
         // 2. 쿨다운을 원자적으로 설정
         boolean acquired = redisService.setIfAbsent(
@@ -54,7 +52,7 @@ public class UserEmailServiceImpl implements UserEmailService {
         );
 
         if (!acquired) {
-            throw new VerificationResendTooSoonException("잠시 후 다시 시도해 주세요.");
+            throw new VerificationResendTooSoonException(RESEND_TOO_SOON_MESSAGE);
         }
         // 3. 카운터 증가
         // emailVerifyRequest 안에서
@@ -65,7 +63,7 @@ public class UserEmailServiceImpl implements UserEmailService {
                             Duration.ofMinutes(15)
                             );
         if (lockedNow) {
-            throw new VerificationResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+            throw new VerificationResendLockedException(RESEND_LOCKED_MESSAGE);
         }
 
         // 4. 발송
@@ -82,7 +80,7 @@ public class UserEmailServiceImpl implements UserEmailService {
     public void reactivateRequest(String email) {
         // 1. 잠금 체크 — 계정 여부와 무관하게 항상
         if (redisService.hasKey(RedisKey.REACTIVE_RESEND_LOCK.getPrefix() + email)) {
-            throw new VerificationResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+            throw new VerificationResendLockedException(RESEND_LOCKED_MESSAGE);
         }
 
         // 2. 연타 방지 — 원자적 setIfAbsent로 체크와 설정을 한 번에
@@ -92,7 +90,7 @@ public class UserEmailServiceImpl implements UserEmailService {
                 Duration.ofSeconds(60)
         );
         if (!acquired) {
-            throw new VerificationResendTooSoonException("잠시 후 다시 시도해 주세요.");
+            throw new VerificationResendTooSoonException(RESEND_TOO_SOON_MESSAGE);
         }
 
         // 3. 카운터 증가 — 이번 요청으로 임계치에 도달해 잠겼으면 발송하지 않고 예외
@@ -103,7 +101,7 @@ public class UserEmailServiceImpl implements UserEmailService {
                 Duration.ofMinutes(15)
         );
         if (lockedNow) {
-            throw new VerificationResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+            throw new VerificationResendLockedException(RESEND_LOCKED_MESSAGE);
         }
 
         // 4. 실제 메일 발송은 복구 가능한 계정일 때만 (없어도 예외 안 던짐 — 계정 존재 노출 방지)
@@ -127,7 +125,7 @@ public class UserEmailServiceImpl implements UserEmailService {
     public void passwordResetRequest(String email) {
         // 1. 잠금 체크 — 계정 여부와 무관하게 항상
         if (redisService.hasKey(RedisKey.PASSWORD_RESET_RESEND_LOCK.getPrefix() + email)) {
-            throw new PasswordResetResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+            throw new PasswordResetResendLockedException(RESEND_LOCKED_MESSAGE);
         }
 
         // 2. 연타 방지 — hasKey+set 대신 원자적 setIfAbsent로 체크와 설정을 한 번에
@@ -137,7 +135,7 @@ public class UserEmailServiceImpl implements UserEmailService {
                 Duration.ofSeconds(60)
         );
         if (!acquired) {
-            throw new PasswordResetResendTooSoonException("잠시 후 다시 시도해 주세요.");
+            throw new PasswordResetResendTooSoonException(RESEND_TOO_SOON_MESSAGE);
         }
 
         // 3. 카운터 증가 — 이번 요청으로 임계치에 도달해 잠겼으면 발송하지 않고 예외
@@ -148,7 +146,7 @@ public class UserEmailServiceImpl implements UserEmailService {
                 Duration.ofMinutes(15)
         );
         if (lockedNow) {
-            throw new PasswordResetResendLockedException("재전송 시도가 초과되어 잠겼습니다.");
+            throw new PasswordResetResendLockedException(RESEND_LOCKED_MESSAGE);
         }
 
         // 4. 실제 메일 발송만 계정 있고 정상일 때 (없어도 예외 안 던짐)
@@ -169,5 +167,8 @@ public class UserEmailServiceImpl implements UserEmailService {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         userCredentialService.updatePassword(now, user, newPassword);
         user.setUpdatedAt(now);
+
+        // 비밀번호 변경이 성공한 뒤에만 토큰을 소모 — 실패(동일 비밀번호 등) 시 같은 링크로 재시도 가능
+        emailVerificationService.consumePasswordResetToken(token, email);
     }
 }

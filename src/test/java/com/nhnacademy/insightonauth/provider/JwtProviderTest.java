@@ -58,10 +58,43 @@ class JwtProviderTest {
     }
 
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
         redisService = mock(RedisService.class);
         jwtProvider = new JwtProvider(privateKeyB64, publicKeyB64, "test-key-v1",
-                Duration.ofMinutes(15), Duration.ofDays(15), null, redisService);
+                Duration.ofMinutes(15), Duration.ofDays(15), redisService);
+    }
+
+    // ---------- 키 로딩 실패 ----------
+
+    private static String garbageKeyB64(String beginMarker, String endMarker) {
+        String pem = beginMarker + "\n"
+                + Base64.getMimeEncoder().encodeToString("not-a-real-key-content".getBytes())
+                + "\n" + endMarker + "\n";
+        return Base64.getEncoder().encodeToString(pem.getBytes());
+    }
+
+    @Test
+    @DisplayName("private key 내용이 올바른 키 형식이 아니면 JwtKeyLoadException")
+    void invalidPrivateKey_throwsJwtKeyLoadException() {
+        String garbagePrivateKey = garbageKeyB64("-----BEGIN PRIVATE KEY-----", "-----END PRIVATE KEY-----");
+        Duration accessValidity = Duration.ofMinutes(15);
+        Duration refreshValidity = Duration.ofDays(15);
+
+        assertThatThrownBy(() -> new JwtProvider(garbagePrivateKey, publicKeyB64, "test-key-v1",
+                accessValidity, refreshValidity, redisService))
+                .isInstanceOf(JwtKeyLoadException.class);
+    }
+
+    @Test
+    @DisplayName("public key 내용이 올바른 키 형식이 아니면 JwtKeyLoadException")
+    void invalidPublicKey_throwsJwtKeyLoadException() {
+        String garbagePublicKey = garbageKeyB64("-----BEGIN PUBLIC KEY-----", "-----END PUBLIC KEY-----");
+        Duration accessValidity = Duration.ofMinutes(15);
+        Duration refreshValidity = Duration.ofDays(15);
+
+        assertThatThrownBy(() -> new JwtProvider(privateKeyB64, garbagePublicKey, "test-key-v1",
+                accessValidity, refreshValidity, redisService))
+                .isInstanceOf(JwtKeyLoadException.class);
     }
 
     // ---------- 생성 / 파싱 ----------
@@ -112,11 +145,11 @@ class JwtProviderTest {
     @Test
     @DisplayName("createRefreshToken — 토큰 발급 + Redis에 jti 저장")
     void createRefreshToken() {
-        String token = jwtProvider.createRefreshToken(1L, List.of("MEMBER"));
+        String token = jwtProvider.createRefreshToken(1L);
 
         Claims c = jwtProvider.parse(token);
         assertThat(c.getSubject()).isEqualTo("1");
-        verify(redisService).set(eq("refresh:1"), eq(c.getId()), eq(Duration.ofDays(15)));
+        verify(redisService).set("refresh:1", c.getId(), Duration.ofDays(15));
     }
 
     @Test
@@ -130,9 +163,9 @@ class JwtProviderTest {
 
     @Test
     @DisplayName("parse — 만료된 토큰이면 JwtException")
-    void parse_expired() throws Exception {
+    void parse_expired() {
         JwtProvider shortLived = new JwtProvider(privateKeyB64, publicKeyB64, "test-key-v1",
-                Duration.ofSeconds(-1), Duration.ofDays(1), null, redisService);
+                Duration.ofSeconds(-1), Duration.ofDays(1), redisService);
         String token = shortLived.createAccessToken(1L, List.of("MEMBER"), "n");
 
         assertThatThrownBy(() -> jwtProvider.parse(token)).isInstanceOf(JwtException.class);
@@ -149,7 +182,7 @@ class JwtProviderTest {
                         + Base64.getMimeEncoder().encodeToString(other.getPrivate().getEncoded())
                         + "\n-----END PRIVATE KEY-----\n").getBytes());
         JwtProvider foreign = new JwtProvider(otherPrivB64, publicKeyB64, "test-key-v1",
-                Duration.ofMinutes(15), Duration.ofDays(15), null, redisService);
+                Duration.ofMinutes(15), Duration.ofDays(15), redisService);
         String token = foreign.createAccessToken(1L, List.of("MEMBER"), "n");
 
         assertThatThrownBy(() -> jwtProvider.parse(token)).isInstanceOf(JwtException.class);
@@ -160,7 +193,7 @@ class JwtProviderTest {
     @Test
     @DisplayName("validateRefreshToken — 정상이면 예외 없음")
     void validateRefreshToken_ok() {
-        String token = jwtProvider.createRefreshToken(1L, List.of("MEMBER"));
+        String token = jwtProvider.createRefreshToken(1L);
         String jti = jwtProvider.parse(token).getId();
         when(redisService.get("refresh:1")).thenReturn(jti);
 
@@ -177,7 +210,7 @@ class JwtProviderTest {
     @Test
     @DisplayName("validateRefreshToken — 다른 userId의 토큰이면 InvalidRefreshTokenException")
     void validateRefreshToken_subjectMismatch() {
-        String token = jwtProvider.createRefreshToken(1L, List.of("MEMBER"));
+        String token = jwtProvider.createRefreshToken(1L);
 
         assertThatThrownBy(() -> jwtProvider.validateRefreshToken(2L, token))
                 .isInstanceOf(InvalidRefreshTokenException.class);
@@ -186,7 +219,7 @@ class JwtProviderTest {
     @Test
     @DisplayName("validateRefreshToken — Redis에 jti 없으면 RefreshTokenNotFoundException")
     void validateRefreshToken_noRedisEntry() {
-        String token = jwtProvider.createRefreshToken(1L, List.of("MEMBER"));
+        String token = jwtProvider.createRefreshToken(1L);
         when(redisService.get("refresh:1")).thenReturn(null);
 
         assertThatThrownBy(() -> jwtProvider.validateRefreshToken(1L, token))
@@ -196,7 +229,7 @@ class JwtProviderTest {
     @Test
     @DisplayName("validateRefreshToken — Redis jti가 토큰 jti와 다르면 InvalidRefreshTokenException")
     void validateRefreshToken_jtiRotated() {
-        String token = jwtProvider.createRefreshToken(1L, List.of("MEMBER"));
+        String token = jwtProvider.createRefreshToken(1L);
         when(redisService.get("refresh:1")).thenReturn("rotated-jti");
 
         assertThatThrownBy(() -> jwtProvider.validateRefreshToken(1L, token))
@@ -222,7 +255,7 @@ class JwtProviderTest {
     @Test
     @DisplayName("extractRoles — roles 클레임이 없으면 빈 리스트 (refresh 토큰)")
     void extractRoles_absent() {
-        String token = jwtProvider.createRefreshToken(1L, List.of("MEMBER"));
+        String token = jwtProvider.createRefreshToken(1L);
         assertThat(jwtProvider.extractRoles(token)).isEmpty();
     }
 

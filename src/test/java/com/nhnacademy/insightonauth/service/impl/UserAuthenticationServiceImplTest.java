@@ -11,13 +11,9 @@ import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserCredential;
 import com.nhnacademy.insightonauth.entity.UserRole;
 import com.nhnacademy.insightonauth.entity.Role;
-import com.nhnacademy.insightonauth.exception.*;
 import com.nhnacademy.insightonauth.exception.auth.*;
 import com.nhnacademy.insightonauth.exception.user.*;
-import com.nhnacademy.insightonauth.exception.email.*;
 import com.nhnacademy.insightonauth.exception.signup.*;
-import com.nhnacademy.insightonauth.exception.oauth.*;
-import com.nhnacademy.insightonauth.exception.external.*;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.redis.ResendCounter;
@@ -241,6 +237,41 @@ class UserAuthenticationServiceImplTest {
         when(tokenService.isWithinRestorePeriod(user)).thenReturn(true);
 
         assertThat(authService.oauthLogin("google", "code").status()).isEqualTo("PENDING_RESTORE");
+    }
+
+    @Test
+    @DisplayName("oauthLogin - 기존 연동이 탈퇴+복구기간 지났으면 마스킹 후 새 계정으로 가입")
+    void oauthLogin_existingWithdrawnExpired() {
+        user.setStatus(Status.WITHDRAW);
+        when(oauthClientResolver.resolve("google")).thenReturn(oauthClient);
+        when(oauthClient.getUserInfo("code")).thenReturn(userInfo());
+        when(oauthService.findByProviderAndProviderUserId("google", "pid-1"))
+                .thenReturn(Optional.of(new Oauth(user, "google", "pid-1")));
+        when(tokenService.isWithinRestorePeriod(user)).thenReturn(false);
+        when(userRepository.existsByEmail("test@test.com")).thenReturn(false);
+        when(tokenService.issueTokens(any(User.class), eq("test@test.com")))
+                .thenReturn(UserLoginResult.success("access", "refresh"));
+
+        UserLoginResult result = authService.oauthLogin("google", "code");
+
+        assertThat(result.accessToken()).isEqualTo("access");
+        verify(oauthService).maskByUser(user);
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    @DisplayName("oauthLogin - 연동 없고 마스킹된 연동이 복구기간 내면 복구 유도")
+    void oauthLogin_reactivatablePendingWithinPeriod() {
+        User maskedOwner = new User("masked@test.com", "가려짐", null);
+        when(oauthClientResolver.resolve("google")).thenReturn(oauthClient);
+        when(oauthClient.getUserInfo("code")).thenReturn(userInfo());
+        when(oauthService.findByProviderAndProviderUserId("google", "pid-1")).thenReturn(Optional.empty());
+        when(oauthService.findReactivatableByProviderAndProviderUserId("google", "pid-1"))
+                .thenReturn(Optional.of(new Oauth(maskedOwner, "google", "pid-1;masked")));
+        when(tokenService.isWithinRestorePeriod(maskedOwner)).thenReturn(true);
+
+        assertThat(authService.oauthLogin("google", "code").status()).isEqualTo("PENDING_RESTORE");
+        verify(userRepository, never()).save(any());
     }
 
     @Test

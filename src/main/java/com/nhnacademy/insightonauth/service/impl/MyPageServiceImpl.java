@@ -4,17 +4,14 @@ import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.client.OauthClientResolver;
 import com.nhnacademy.insightonauth.dto.core.UserGroupResponse;
 import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
-import com.nhnacademy.insightonauth.dto.mypage.RoleResponse;
+import com.nhnacademy.insightonauth.dto.mypage.MyRoleResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.entity.Oauth;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserCredential;
-import com.nhnacademy.insightonauth.exception.*;
 import com.nhnacademy.insightonauth.exception.auth.*;
 import com.nhnacademy.insightonauth.exception.user.*;
-import com.nhnacademy.insightonauth.exception.email.*;
-import com.nhnacademy.insightonauth.exception.signup.*;
 import com.nhnacademy.insightonauth.exception.oauth.*;
 import com.nhnacademy.insightonauth.exception.external.*;
 import com.nhnacademy.insightonauth.service.*;
@@ -73,11 +70,11 @@ public class MyPageServiceImpl implements MyPageService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RoleResponse> findMyRoles(Long userId) {
+    public List<MyRoleResponse> findMyRoles(Long userId) {
         User user = userManagementService.findById(userId);
 
         return userRoleService.findByUser(user).stream()
-                .map(userRole -> new RoleResponse(userRole.getRole()))
+                .map(userRole -> new MyRoleResponse(userRole.getRole()))
                 .toList();
     }
 

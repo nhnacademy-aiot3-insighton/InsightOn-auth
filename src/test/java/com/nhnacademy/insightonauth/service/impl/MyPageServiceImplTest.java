@@ -10,11 +10,8 @@ import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserCredential;
 import com.nhnacademy.insightonauth.entity.UserRole;
-import com.nhnacademy.insightonauth.exception.*;
 import com.nhnacademy.insightonauth.exception.auth.*;
 import com.nhnacademy.insightonauth.exception.user.*;
-import com.nhnacademy.insightonauth.exception.email.*;
-import com.nhnacademy.insightonauth.exception.signup.*;
 import com.nhnacademy.insightonauth.exception.oauth.*;
 import com.nhnacademy.insightonauth.exception.external.*;
 import com.nhnacademy.insightonauth.service.*;
@@ -281,5 +278,26 @@ class MyPageServiceImplTest {
                 .isInstanceOf(CoreServiceUnavailableException.class);
 
         verify(userManagementService, never()).deleteUser(anyLong());
+    }
+
+    // ---------- confirmMerge ----------
+
+    @Test
+    @DisplayName("confirmMerge - provider 재인증 code로 providerId 확인 후 mergeAccount 위임")
+    void confirmMerge_delegatesToMergeAccount() {
+        User secondary = new User("s@test.com", "s", "01055556666");
+        ReflectionTestUtils.setField(secondary, "userId", 2L);
+        Oauth oauth = new Oauth(secondary, "google", "pid-1");
+        when(oauthClientResolver.resolve("google")).thenReturn(oauthClient);
+        when(oauthClient.getUserInfo("auth-code"))
+                .thenReturn(new OauthUserInfo("s@test.com", "s", "pid-1"));
+        when(userManagementService.findById(1L)).thenReturn(user);
+        when(oauthService.findByProviderAndProviderUserId("google", "pid-1")).thenReturn(Optional.of(oauth));
+        when(coreService.isGroupManager(2L)).thenReturn(false);
+
+        myPageService.confirmMerge(1L, 2L, "google", "auth-code");
+
+        assertThat(oauth.getUser()).isEqualTo(user);
+        verify(userManagementService).deleteUser(2L);
     }
 }

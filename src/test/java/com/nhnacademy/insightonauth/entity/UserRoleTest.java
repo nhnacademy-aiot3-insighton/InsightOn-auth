@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class UserRoleTest {
 
@@ -34,6 +35,13 @@ class UserRoleTest {
             assertThat(userRole.getRole()).isEqualTo(role);
             assertThat(userRole.getCreatedAt()).isNotNull();
         }
+    }
+
+    @Test
+    @DisplayName("user가 null이면 NullPointerException")
+    void createUserRole_nullUser() {
+        assertThatThrownBy(() -> new UserRole(null, Role.MEMBER))
+                .isInstanceOf(NullPointerException.class);
     }
 
 }

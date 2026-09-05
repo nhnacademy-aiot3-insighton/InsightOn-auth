@@ -1,7 +1,9 @@
 package com.nhnacademy.insightonauth.exception;
 
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
+@Getter
 public enum ErrorCode {
     CORE_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT),
@@ -45,7 +47,9 @@ public enum ErrorCode {
 
     REDIS_OPERATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE),
 
-    INVALID_EMAIL_FORMAT(HttpStatus.BAD_REQUEST);
+    INVALID_EMAIL_FORMAT(HttpStatus.BAD_REQUEST),
+
+    OAUTH_PROVIDER_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY);
 
     private final HttpStatus status;
 
@@ -53,7 +57,4 @@ public enum ErrorCode {
         this.status = status;
     }
 
-    public HttpStatus getStatus() {
-        return status;
-    }
 }

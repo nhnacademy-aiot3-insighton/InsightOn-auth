@@ -21,7 +21,6 @@ class UserCredentialTest {
     @Test
     @DisplayName("userCredential 생성자 생성 성공")
     void createUserCredential() {
-        User user = new User("test@test.com", "test", "01012345678");
         UserCredential credential = new UserCredential(user, "hashed-password");
 
         assertThat(credential.getUser()).isEqualTo(user);

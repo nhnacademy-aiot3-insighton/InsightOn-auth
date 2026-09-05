@@ -40,6 +40,14 @@ import java.util.UUID;
 public class AuthController {
 
     private static final String X_USER_ID = "X-User-Id";
+    private static final String PENDING_RESTORE_STATUS = "PENDING_RESTORE";
+
+    // 환경별로 달라지는 건 도메인뿐이고(app.front-url, oauthWebSupport.front()가 붙여줌),
+    // 이 경로 자체는 프론트 라우팅 계약이라 프로퍼티로 뺄 대상이 아니다.
+    @SuppressWarnings("java:S1075")
+    private static final String LOGIN_OAUTH_ERROR_PATH = "/login?oauthError=1";
+    @SuppressWarnings("java:S1075")
+    private static final String MYPAGE_LINK_ERROR_PATH = "/mypage?linkError=1";
 
     private final UserAuthenticationService userAuthenticationService;
     private final UserEmailService userEmailService;
@@ -99,7 +107,7 @@ public class AuthController {
 
         // 탈퇴 후 복구 가능 기간 내 계정 — 로그인 성공이 아니라 "복구 안내" 상태.
         // accessToken 이 없으므로 admin 체크 대상이 아니다.
-        if ("PENDING_RESTORE".equals(result.status())) {
+        if (PENDING_RESTORE_STATUS.equals(result.status())) {
             return ResponseEntity.ok(UserLoginResponse.pendingRestore());
         }
 
@@ -114,7 +122,7 @@ public class AuthController {
     // 로그아웃 — refresh 토큰 삭제 + 현재 access 토큰 블랙리스트 등록
     @PostMapping("/logout")
     public ResponseEntity<Void> doLogout(
-            @RequestHeader(name = X_USER_ID) @Valid Long userId,
+            @RequestHeader(name = X_USER_ID) Long userId,
             @RequestHeader("Authorization") String token) {
         String accessToken = token.replace("Bearer ", "");
         userAuthenticationService.logout(userId, accessToken);
@@ -131,7 +139,7 @@ public class AuthController {
         UserLoginResult result = userAuthenticationService.oauthLogin(provider, request.code());
 
         // 탈퇴 후 복구 가능 기간 내 계정 — 로그인 성공이 아니라 "복구 안내" 상태.
-        if ("PENDING_RESTORE".equals(result.status())) {
+        if (PENDING_RESTORE_STATUS.equals(result.status())) {
             return ResponseEntity.ok(UserLoginResponse.pendingRestore());
         }
 
@@ -147,7 +155,7 @@ public class AuthController {
     @GetMapping("/oauth/authorize/{provider}")
     public ResponseEntity<Void> oauthAuthorize(@PathVariable String provider) {
         if (!oauthWebSupport.supports(provider)) {
-            return redirect(oauthWebSupport.front("/login?oauthError=1"), null);
+            return redirect(oauthWebSupport.front(LOGIN_OAUTH_ERROR_PATH), null);
         }
         String state = UUID.randomUUID() + "." + provider;
         return ResponseEntity.status(HttpStatus.FOUND)
@@ -169,7 +177,7 @@ public class AuthController {
 
         Long userId = parseUserId(accessToken);
         if (!oauthWebSupport.supports(provider) || userId == null) {
-            return redirect(oauthWebSupport.front("/mypage?linkError=1"), null);
+            return redirect(oauthWebSupport.front(MYPAGE_LINK_ERROR_PATH), null);
         }
         // 연동 대상 userId 를 state 에 실어 둔다. state 는 콜백에서 서버가 심은 oauthState 쿠키와
         // 통째로 대조되므로(위조 불가), 콜백은 이 값을 "연동을 시작한 유저"로 신뢰할 수 있다.
@@ -196,12 +204,11 @@ public class AuthController {
         // provider 취소(error=access_denied)·code 누락도 연동이었으면 마이페이지로 돌려보낸다.
         // state 형식: 로그인 "<uuid>.<provider>", 연동 "<uuid>.<provider>.link.<userId>" — nonce·provider 에 점 없음.
         boolean link = expectedState != null && expectedState.contains(".link");
-        String errorRedirect = link ? "/mypage?linkError=1" : "/login?oauthError=1";
+        boolean stateMatched = state != null && state.equals(expectedState);
 
-        if (error != null || code == null || state == null
-                || expectedState == null || !state.equals(expectedState)) {
-            log.warn("[OAuth] 콜백 검증 실패: error={}, link={}, stateMatched={}",
-                    error, link, state != null && state.equals(expectedState));
+        if (error != null || code == null || expectedState == null || !stateMatched) {
+            String errorRedirect = link ? MYPAGE_LINK_ERROR_PATH : LOGIN_OAUTH_ERROR_PATH;
+            log.warn("[OAuth] 콜백 검증 실패: error={}, link={}, stateMatched={}", error, link, stateMatched);
             return redirect(oauthWebSupport.front(errorRedirect), expiredState);
         }
 
@@ -209,40 +216,48 @@ public class AuthController {
         String provider = parts[1];
 
         if (link) {
-            // state 의 userId(연동 시작 유저) 와 콜백 시점 accessToken 쿠키의 userId(현재 로그인 유저) 가
-            // 같아야만 연동을 진행한다. 동의 화면을 띄운 뒤 다른 탭에서 계정을 바꾸면 여기서 걸린다.
-            Long stateUserId = parts.length > 3 ? toUserId(parts[3]) : null;
-            Long currentUserId = parseUserId(accessToken);
-            if (stateUserId == null || !stateUserId.equals(currentUserId)) {
-                return redirect(oauthWebSupport.front("/mypage?linkError=auth"), expiredState);
-            }
-            // state: "<nonce>.<provider>.link.<userId>" 뒤에 병합 확인 왕복이면 ".merge.<secondaryUserId>" 가 더 붙는다.
-            Long mergeSecondaryUserId = parts.length > 5 && "merge".equals(parts[4]) ? toUserId(parts[5]) : null;
-            try {
-                if (mergeSecondaryUserId != null) {
-                    myPageService.confirmMerge(stateUserId, mergeSecondaryUserId, provider, code);
-                    return redirect(oauthWebSupport.front("/mypage?merged=1"), expiredState);
-                }
-                myPageService.linkOauth(stateUserId, provider, code);
-                return redirect(oauthWebSupport.front("/mypage?linked=1"), expiredState);
-            } catch (OauthAlreadyLinkedException e) {
-                return redirect(oauthWebSupport.front("/mypage?linkError=already"), expiredState);
-            } catch (OauthLinkedToOtherAccountException e) {
-                return redirect(oauthWebSupport.front(
-                        "/mypage?linkError=other_account&conflictUserId=" + e.getConflictingUserId()
-                                + "&provider=" + provider), expiredState);
-            } catch (ManagerGroupExistsException e) {
-                return redirect(oauthWebSupport.front("/mypage?linkError=manager_account"), expiredState);
-            } catch (RuntimeException e) {
-                log.warn("[OAuth] 연동/병합 실패: {}", e.getMessage());
-                return redirect(oauthWebSupport.front("/mypage?linkError=1"), expiredState);
-            }
+            return handleLinkCallback(parts, provider, code, accessToken, expiredState);
         }
+        return handleLoginCallback(provider, code, expiredState);
+    }
 
+    // state 의 userId(연동 시작 유저) 와 콜백 시점 accessToken 쿠키의 userId(현재 로그인 유저) 가
+    // 같아야만 연동을 진행한다. 동의 화면을 띄운 뒤 다른 탭에서 계정을 바꾸면 여기서 걸린다.
+    private ResponseEntity<Void> handleLinkCallback(
+            String[] parts, String provider, String code, String accessToken, String expiredState) {
+        Long stateUserId = parts.length > 3 ? toUserId(parts[3]) : null;
+        Long currentUserId = parseUserId(accessToken);
+        if (stateUserId == null || !stateUserId.equals(currentUserId)) {
+            return redirect(oauthWebSupport.front("/mypage?linkError=auth"), expiredState);
+        }
+        // state: "<nonce>.<provider>.link.<userId>" 뒤에 병합 확인 왕복이면 ".merge.<secondaryUserId>" 가 더 붙는다.
+        Long mergeSecondaryUserId = parts.length > 5 && "merge".equals(parts[4]) ? toUserId(parts[5]) : null;
+        try {
+            if (mergeSecondaryUserId != null) {
+                myPageService.confirmMerge(stateUserId, mergeSecondaryUserId, provider, code);
+                return redirect(oauthWebSupport.front("/mypage?merged=1"), expiredState);
+            }
+            myPageService.linkOauth(stateUserId, provider, code);
+            return redirect(oauthWebSupport.front("/mypage?linked=1"), expiredState);
+        } catch (OauthAlreadyLinkedException e) {
+            return redirect(oauthWebSupport.front("/mypage?linkError=already"), expiredState);
+        } catch (OauthLinkedToOtherAccountException e) {
+            return redirect(oauthWebSupport.front(
+                    "/mypage?linkError=other_account&conflictUserId=" + e.getConflictingUserId()
+                            + "&provider=" + provider), expiredState);
+        } catch (ManagerGroupExistsException e) {
+            return redirect(oauthWebSupport.front("/mypage?linkError=manager_account"), expiredState);
+        } catch (RuntimeException e) {
+            log.warn("[OAuth] 연동/병합 실패: {}", e.getMessage());
+            return redirect(oauthWebSupport.front(MYPAGE_LINK_ERROR_PATH), expiredState);
+        }
+    }
+
+    private ResponseEntity<Void> handleLoginCallback(String provider, String code, String expiredState) {
         try {
             UserLoginResult result = userAuthenticationService.oauthLogin(provider, code);
 
-            if ("PENDING_RESTORE".equals(result.status())) {
+            if (PENDING_RESTORE_STATUS.equals(result.status())) {
                 return redirect(oauthWebSupport.front("/reactivate"), expiredState);
             }
 
@@ -257,7 +272,7 @@ public class AuthController {
             return redirect(oauthWebSupport.front("/login?oauthError=email_taken"), expiredState);
         } catch (RuntimeException e) {
             log.warn("[OAuth] 소셜 로그인 실패: {}", e.getMessage());
-            return redirect(oauthWebSupport.front("/login?oauthError=1"), expiredState);
+            return redirect(oauthWebSupport.front(LOGIN_OAUTH_ERROR_PATH), expiredState);
         }
     }
 

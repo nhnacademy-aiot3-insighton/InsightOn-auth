@@ -1,5 +1,8 @@
 package com.nhnacademy.insightonauth.entity;
 
+import lombok.Getter;
+
+@Getter
 public enum Role {
     ADMIN("관리자", true, false),
     MEMBER("일반회원", false, true);
@@ -15,17 +18,5 @@ public enum Role {
         this.label = label;
         this.exclusive = exclusive;
         this.base = base;
-    }
-
-    public String getLabel() {
-        return label;
-    }
-
-    public boolean isExclusive() {
-        return exclusive;
-    }
-
-    public boolean isBase() {
-        return base;
     }
 }

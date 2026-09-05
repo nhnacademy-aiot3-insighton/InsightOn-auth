@@ -3,13 +3,8 @@ package com.nhnacademy.insightonauth.service.impl;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
-import com.nhnacademy.insightonauth.exception.*;
-import com.nhnacademy.insightonauth.exception.auth.*;
 import com.nhnacademy.insightonauth.exception.user.*;
 import com.nhnacademy.insightonauth.exception.email.*;
-import com.nhnacademy.insightonauth.exception.signup.*;
-import com.nhnacademy.insightonauth.exception.oauth.*;
-import com.nhnacademy.insightonauth.exception.external.*;
 import com.nhnacademy.insightonauth.redis.RedisService;
 import com.nhnacademy.insightonauth.redis.ResendCounter;
 import com.nhnacademy.insightonauth.repository.UserRepository;
@@ -166,6 +161,36 @@ class UserEmailServiceImplTest {
     // ---------- passwordResetRequest ----------
 
     @Test
+    @DisplayName("passwordResetRequest - 잠겨있으면 예외")
+    void passwordResetRequest_locked() {
+        when(redisService.hasKey(contains("password-reset-resend-lock"))).thenReturn(true);
+
+        assertThatThrownBy(() -> userEmailService.passwordResetRequest("test@test.com"))
+                .isInstanceOf(PasswordResetResendLockedException.class);
+    }
+
+    @Test
+    @DisplayName("passwordResetRequest - 쿨다운이면 예외")
+    void passwordResetRequest_tooSoon() {
+        when(redisService.hasKey(anyString())).thenReturn(false);
+        when(redisService.setIfAbsent(contains("password-reset-resend-cooldown"), anyString(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> userEmailService.passwordResetRequest("test@test.com"))
+                .isInstanceOf(PasswordResetResendTooSoonException.class);
+    }
+
+    @Test
+    @DisplayName("passwordResetRequest - 이번 요청으로 잠기면 예외")
+    void passwordResetRequest_lockedNow() {
+        when(redisService.hasKey(anyString())).thenReturn(false);
+        when(redisService.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
+        when(resendCounter.increase(anyString(), anyString(), anyInt(), any())).thenReturn(true);
+
+        assertThatThrownBy(() -> userEmailService.passwordResetRequest("test@test.com"))
+                .isInstanceOf(PasswordResetResendLockedException.class);
+    }
+
+    @Test
     @DisplayName("passwordResetRequest - 계정이 없어도 예외 없이 종료 (메일만 미발송)")
     void passwordResetRequest_noAccount() {
         when(redisService.hasKey(anyString())).thenReturn(false);
@@ -216,5 +241,20 @@ class UserEmailServiceImplTest {
         userEmailService.passwordResetConfirm("token", "newPw");
 
         verify(userCredentialService).updatePassword(any(), eq(user), eq("newPw"));
+        verify(emailVerificationService).consumePasswordResetToken("token", "test@test.com");
+    }
+
+    @Test
+    @DisplayName("passwordResetConfirm - 비밀번호 변경 실패 시 토큰을 소모하지 않는다 (재시도 가능)")
+    void passwordResetConfirm_updateFails_tokenNotConsumed() {
+        when(emailVerificationService.emailTokenVerify("token")).thenReturn("test@test.com");
+        when(userManagementService.findByEmail("test@test.com")).thenReturn(user);
+        doThrow(new SameAsOldPasswordException("새 비밀번호는 기존 비밀번호와 달라야 합니다."))
+                .when(userCredentialService).updatePassword(any(), eq(user), eq("newPw"));
+
+        assertThatThrownBy(() -> userEmailService.passwordResetConfirm("token", "newPw"))
+                .isInstanceOf(SameAsOldPasswordException.class);
+
+        verify(emailVerificationService, never()).consumePasswordResetToken(anyString(), anyString());
     }
 }

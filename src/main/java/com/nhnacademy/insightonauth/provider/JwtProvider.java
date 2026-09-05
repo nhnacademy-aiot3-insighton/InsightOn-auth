@@ -7,14 +7,16 @@ import com.nhnacademy.insightonauth.redis.RedisService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.Duration;
@@ -28,6 +30,7 @@ public class JwtProvider {
     private final PrivateKey privateKey;
     private final PublicKey publicKey;
     private final String keyId;
+    @Getter
     private final Duration accessValidity;
     private final Duration refreshValidity;
     private final RedisService redisService;
@@ -38,8 +41,7 @@ public class JwtProvider {
             @Value("${jwt.key-id}") String keyId,
             @Value("${jwt.access-token-validity}") Duration accessValidity,
             @Value("${jwt.refresh-token-validity}") Duration refreshValidity,
-            StringRedisTemplate redisTemplate,
-            RedisService redisService) throws Exception {
+            RedisService redisService) {
         this.privateKey = loadPrivateKey(privateKeyBase64);
         this.publicKey = loadPublicKey(publicKeyBase64);
         this.keyId = keyId;
@@ -76,11 +78,7 @@ public class JwtProvider {
         return token;
     }
 
-    public Duration getAccessValidity() {
-        return accessValidity;
-    }
-
-    public String createRefreshToken(Long userId, List<String> roles) {
+    public String createRefreshToken(Long userId) {
         Instant now = Instant.now();
         String jti = UUID.randomUUID().toString();
         String token = Jwts.builder()
@@ -129,7 +127,7 @@ public class JwtProvider {
                 .getPayload();
     }
 
-    private PrivateKey loadPrivateKey(String base64Key) throws Exception {
+    private PrivateKey loadPrivateKey(String base64Key) {
         String pemText = new String(Base64.getDecoder().decode(base64Key));
 
         String content = pemText
@@ -137,11 +135,15 @@ public class JwtProvider {
                 .replace("-----END PRIVATE KEY-----", "")
                 .replaceAll("\\s", "");
         byte[] decoded = Base64.getDecoder().decode(content);
-        return KeyFactory.getInstance("RSA")
-                .generatePrivate(new PKCS8EncodedKeySpec(decoded));
+        try {
+            return KeyFactory.getInstance("RSA")
+                    .generatePrivate(new PKCS8EncodedKeySpec(decoded));
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+            throw new JwtKeyLoadException("JWT private key 로딩에 실패했습니다.", e);
+        }
     }
 
-    private PublicKey loadPublicKey(String base64Key) throws Exception {
+    private PublicKey loadPublicKey(String base64Key) {
         String pemText = new String(Base64.getDecoder().decode(base64Key));
 
         String content = pemText
@@ -149,8 +151,12 @@ public class JwtProvider {
                 .replace("-----END PUBLIC KEY-----", "")
                 .replaceAll("\\s", "");
         byte[] decoded = Base64.getDecoder().decode(content);
-        return KeyFactory.getInstance("RSA")
-                .generatePublic(new X509EncodedKeySpec(decoded));
+        try {
+            return KeyFactory.getInstance("RSA")
+                    .generatePublic(new X509EncodedKeySpec(decoded));
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+            throw new JwtKeyLoadException("JWT public key 로딩에 실패했습니다.", e);
+        }
     }
 
     /**

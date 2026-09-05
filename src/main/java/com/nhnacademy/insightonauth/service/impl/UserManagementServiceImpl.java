@@ -32,6 +32,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class UserManagementServiceImpl implements UserManagementService {
 
+    private static final String USER_NOT_FOUND_MESSAGE = "유저를 찾을 수 없습니다.";
+
     private final UserRepository userRepository;
     private final UserCredentialService userCredentialService;
     private final UserRoleService userRoleService;
@@ -70,15 +72,21 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Override
     @Transactional(readOnly = true)
     public User findById(Long userId) {
+        return getUserOrThrow(userId);
+    }
+
+    // findById()는 외부 공개용 트랜잭션 경계라, 이미 같은 클래스의 쓰기 트랜잭션 안에서 실행 중인
+    // 내부 호출들은 self-invocation(프록시 우회)을 피하려고 이 순수 조회 로직을 직접 쓴다.
+    private User getUserOrThrow(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND_MESSAGE));
     }
 
     @Override
     @Transactional(readOnly = true)
     public User findByEmail(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND_MESSAGE));
     }
 
     @Override
@@ -120,7 +128,7 @@ public class UserManagementServiceImpl implements UserManagementService {
 
     @Override
     public void activate(Long userId) {
-        User user = findById(userId);
+        User user = getUserOrThrow(userId);
 
         if (user.getStatus() == Status.WITHDRAW) {
             throw new InvalidUserStatusException("이미 탈퇴한 계정입니다.");
@@ -133,7 +141,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     //탈톼시 비밀번호 확인
     @Override
     public void withdraw(Long userId, String accessToken) {
-        User user = findById(userId);
+        User user = getUserOrThrow(userId);
 
         if (user.getStatus() == Status.WITHDRAW) {
             throw new InvalidUserStatusException("이미 탈퇴한 계정입니다.");
@@ -161,7 +169,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     // block 계정도 sleep으로 해도되나
     @Override
     public void sleep(Long userId) {
-        User user = findById(userId);
+        User user = getUserOrThrow(userId);
 
         if (user.getStatus() == Status.SLEEP) {
             throw new InvalidUserStatusException("이미 휴면 상태 계정입니다.");
@@ -180,7 +188,7 @@ public class UserManagementServiceImpl implements UserManagementService {
 
     @Override
     public void block(Long userId) {
-        User user = findById(userId);
+        User user = getUserOrThrow(userId);
 
         if (user.getStatus() == Status.BLOCK) {
             throw new InvalidUserStatusException("이미 정지된 계정입니다.");
@@ -200,7 +208,7 @@ public class UserManagementServiceImpl implements UserManagementService {
 
     @Override
     public void deleteUser(Long userId) {
-        User user = findById(userId);
+        User user = getUserOrThrow(userId);
 
         // Role 삭제
         userRoleService.deleteUserRole(user);
@@ -241,7 +249,7 @@ public class UserManagementServiceImpl implements UserManagementService {
         String normalized = PhoneNumberUtil.normalize(phoneNumber);
 
         User user = userRepository.findByUserNameAndPhoneNumber(userName, normalized)
-                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND_MESSAGE));
 
         String email = user.getEmail();
         if (!email.contains("@")) {
@@ -277,7 +285,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     }
 
     private User findActiveUser(Long userId) {
-        User user = findById(userId);
+        User user = getUserOrThrow(userId);
         if (user.getStatus() != Status.ACTIVE) {
             throw new InvalidUserStatusException("정상 상태의 계정이 아닙니다.");
         }

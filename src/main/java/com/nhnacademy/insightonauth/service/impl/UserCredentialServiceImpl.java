@@ -30,10 +30,8 @@ public class UserCredentialServiceImpl implements UserCredentialService {
     @Override
     @Transactional(readOnly = true)
     public UserCredential findByUser(User user) {
-        UserCredential userCredential = userCredentialRepository.findByUser(user)
+        return userCredentialRepository.findByUser(user)
                 .orElseThrow(() -> new UserCredentialsNotFoundException("유저 인증 정보가 없습니다."));
-
-        return userCredential;
     }
 
     @Override
@@ -45,7 +43,9 @@ public class UserCredentialServiceImpl implements UserCredentialService {
 
     @Override
     public void updatePassword(OffsetDateTime now, User user, String password) {
-        UserCredential userCredential = findByUser(user);
+        // self-invocation으로 findByUser()의 @Transactional(readOnly=true)가 무시되는 걸 피하려고 직접 조회
+        UserCredential userCredential = userCredentialRepository.findByUser(user)
+                .orElseThrow(() -> new UserCredentialsNotFoundException("유저 인증 정보가 없습니다."));
 
         // 마이페이지 변경 / 이메일 재설정 양쪽 모두 여기서 기존 비밀번호와 동일 여부를 검사한다
         if (passwordEncoder.matches(password, userCredential.getPasswordHash())) {
