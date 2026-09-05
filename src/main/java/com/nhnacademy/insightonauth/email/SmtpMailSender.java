@@ -40,7 +40,7 @@ public class SmtpMailSender {
         } catch (MessagingException | UnsupportedEncodingException e) {
             throw new EmailSendException("이메일 발송에 실패했습니다.", e);
         } catch (MailException e) {
-            log.error("이메일 전송 실패(타임아웃 등) - to: {}, error: {}", to, e.getMessage());
+            log.error("이메일 전송 실패(타임아웃 등) - error: {}", e.getMessage());
             throw new EmailSendException("이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.", e);
         }
         log.info("이메일 발송 성공");
