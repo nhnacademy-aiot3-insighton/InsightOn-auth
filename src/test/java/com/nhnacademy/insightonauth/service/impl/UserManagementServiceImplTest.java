@@ -4,6 +4,7 @@ import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.exception.user.*;
+import com.nhnacademy.insightonauth.exception.email.*;
 import com.nhnacademy.insightonauth.exception.signup.*;
 import com.nhnacademy.insightonauth.exception.external.*;
 import com.nhnacademy.insightonauth.redis.RedisService;
@@ -343,5 +344,16 @@ class UserManagementServiceImplTest {
 
         assertThatThrownBy(() -> userManagementService.findMaskedEmail("test", "01012345678"))
                 .isInstanceOf(UserNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("findMaskedEmail - 이메일 형식이 올바르지 않으면 예외")
+    void findMaskedEmail_invalidFormat() {
+        User malformed = new User("not-an-email", "test", "01012345678");
+        when(userRepository.findByUserNameAndPhoneNumber("test", "01012345678"))
+                .thenReturn(Optional.of(malformed));
+
+        assertThatThrownBy(() -> userManagementService.findMaskedEmail("test", "01012345678"))
+                .isInstanceOf(InvalidEmailFormatException.class);
     }
 }

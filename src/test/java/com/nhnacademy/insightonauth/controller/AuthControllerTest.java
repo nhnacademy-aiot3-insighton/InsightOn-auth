@@ -7,6 +7,10 @@ import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
 import com.nhnacademy.insightonauth.dto.auth.TokenRefreshResponse;
 import com.nhnacademy.insightonauth.entity.Role;
+import com.nhnacademy.insightonauth.exception.oauth.OauthAlreadyLinkedException;
+import com.nhnacademy.insightonauth.exception.oauth.OauthLinkedToOtherAccountException;
+import com.nhnacademy.insightonauth.exception.signup.EmailAlreadyRegisteredException;
+import com.nhnacademy.insightonauth.exception.user.ManagerGroupExistsException;
 import com.nhnacademy.insightonauth.handler.GlobalExceptionHandler;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.service.MyPageService;
@@ -25,6 +29,7 @@ import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAut
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -32,11 +37,15 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -278,5 +287,319 @@ class AuthControllerTest {
         mvc.perform(post("/api/v1/auth/refresh")
                         .cookie(new Cookie("refreshToken", "bad")))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ---------- 브라우저 주도 OAuth ----------
+
+    private void stubFront() {
+        when(oauthWebSupport.front(anyString()))
+                .thenAnswer(inv -> "https://front.test" + inv.<String>getArgument(0));
+        when(oauthWebSupport.expiredStateCookie())
+                .thenReturn(ResponseCookie.from(OauthWebSupport.STATE_COOKIE, "").maxAge(0).build());
+    }
+
+    @Test
+    @DisplayName("GET /oauth/authorize/{provider} — 지원하는 provider면 302 + state 쿠키")
+    void oauthAuthorize() throws Exception {
+        when(oauthWebSupport.supports("google")).thenReturn(true);
+        when(oauthWebSupport.stateCookie(anyString()))
+                .thenReturn(ResponseCookie.from(OauthWebSupport.STATE_COOKIE, "nonce.google").build());
+        when(oauthWebSupport.authorizeUrl(eq("google"), anyString()))
+                .thenReturn("https://accounts.google.com/o/oauth2/v2/auth?state=nonce.google");
+
+        mvc.perform(get("/api/v1/auth/oauth/authorize/google"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://accounts.google.com/o/oauth2/v2/auth?state=nonce.google"))
+                .andExpect(header().exists("Set-Cookie"));
+    }
+
+    @Test
+    @DisplayName("GET /oauth/authorize/{provider} — 지원 안 하는 provider면 로그인 오류로 302")
+    void oauthAuthorize_unsupported() throws Exception {
+        stubFront();
+        when(oauthWebSupport.supports("kakao")).thenReturn(false);
+
+        mvc.perform(get("/api/v1/auth/oauth/authorize/kakao"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/login?oauthError=1"));
+    }
+
+    @Test
+    @DisplayName("GET /oauth/link/authorize/{provider} — 정상 로그인 상태면 302 + state 쿠키")
+    void oauthLinkAuthorize() throws Exception {
+        when(oauthWebSupport.supports("google")).thenReturn(true);
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("5");
+        when(jwtProvider.parse("valid-access")).thenReturn(claims);
+        when(oauthWebSupport.stateCookie(anyString()))
+                .thenReturn(ResponseCookie.from(OauthWebSupport.STATE_COOKIE, "nonce.google.link.5").build());
+        when(oauthWebSupport.authorizeUrl(eq("google"), anyString()))
+                .thenReturn("https://accounts.google.com/o/oauth2/v2/auth?state=nonce.google.link.5");
+
+        mvc.perform(get("/api/v1/auth/oauth/link/authorize/google")
+                        .cookie(new Cookie("accessToken", "valid-access")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://accounts.google.com/o/oauth2/v2/auth?state=nonce.google.link.5"));
+    }
+
+    @Test
+    @DisplayName("GET /oauth/link/authorize/{provider} — accessToken 쿠키 없으면 마이페이지 오류로 302")
+    void oauthLinkAuthorize_noAccessToken() throws Exception {
+        stubFront();
+        when(oauthWebSupport.supports("google")).thenReturn(true);
+
+        mvc.perform(get("/api/v1/auth/oauth/link/authorize/google"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/mypage?linkError=1"));
+    }
+
+    @Test
+    @DisplayName("GET /oauth/link/authorize/{provider} — 지원 안 하는 provider면 마이페이지 오류로 302")
+    void oauthLinkAuthorize_unsupported() throws Exception {
+        stubFront();
+        when(oauthWebSupport.supports("kakao")).thenReturn(false);
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("5");
+        when(jwtProvider.parse("valid-access")).thenReturn(claims);
+
+        mvc.perform(get("/api/v1/auth/oauth/link/authorize/kakao")
+                        .cookie(new Cookie("accessToken", "valid-access")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/mypage?linkError=1"));
+    }
+
+    // ---------- GET /oauth/callback ----------
+
+    @Test
+    @DisplayName("callback — provider 오류(error 파라미터)면 로그인 오류로 302")
+    void oauthCallback_providerError() throws Exception {
+        stubFront();
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("error", "access_denied")
+                        .param("code", "c")
+                        .param("state", "nonce.google")
+                        .cookie(new Cookie(OauthWebSupport.STATE_COOKIE, "nonce.google")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/login?oauthError=1"));
+    }
+
+    @Test
+    @DisplayName("callback — state 쿠키가 없으면 로그인 오류로 302")
+    void oauthCallback_missingExpectedState() throws Exception {
+        stubFront();
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("code", "c")
+                        .param("state", "nonce.google"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/login?oauthError=1"));
+    }
+
+    @Test
+    @DisplayName("callback — state 불일치면 연동 왕복이었으면 마이페이지 오류로 302")
+    void oauthCallback_stateMismatch_link() throws Exception {
+        stubFront();
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("code", "c")
+                        .param("state", "nonce.google.link.5")
+                        .cookie(new Cookie(OauthWebSupport.STATE_COOKIE, "different.google.link.5")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/mypage?linkError=1"));
+    }
+
+    @Test
+    @DisplayName("callback — 연동 중 계정이 바뀌면(state userId ≠ 현재 로그인 유저) 마이페이지 인증오류로 302")
+    void oauthCallback_link_userMismatch() throws Exception {
+        stubFront();
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("999");
+        when(jwtProvider.parse("current-access")).thenReturn(claims);
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("code", "c")
+                        .param("state", "nonce.google.link.5")
+                        .cookie(new Cookie(OauthWebSupport.STATE_COOKIE, "nonce.google.link.5"))
+                        .cookie(new Cookie("accessToken", "current-access")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/mypage?linkError=auth"));
+    }
+
+    @Test
+    @DisplayName("callback — 연동 성공이면 마이페이지 linked=1 로 302")
+    void oauthCallback_link_success() throws Exception {
+        stubFront();
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("5");
+        when(jwtProvider.parse("current-access")).thenReturn(claims);
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("code", "c")
+                        .param("state", "nonce.google.link.5")
+                        .cookie(new Cookie(OauthWebSupport.STATE_COOKIE, "nonce.google.link.5"))
+                        .cookie(new Cookie("accessToken", "current-access")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/mypage?linked=1"));
+
+        verify(myPageService).linkOauth(5L, "google", "c");
+    }
+
+    @Test
+    @DisplayName("callback — 병합 확인 왕복이면 confirmMerge 호출 후 mypage?merged=1 로 302")
+    void oauthCallback_link_mergeSuccess() throws Exception {
+        stubFront();
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("5");
+        when(jwtProvider.parse("current-access")).thenReturn(claims);
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("code", "c")
+                        .param("state", "nonce.google.link.5.merge.9")
+                        .cookie(new Cookie(OauthWebSupport.STATE_COOKIE, "nonce.google.link.5.merge.9"))
+                        .cookie(new Cookie("accessToken", "current-access")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/mypage?merged=1"));
+
+        verify(myPageService).confirmMerge(5L, 9L, "google", "c");
+        verify(myPageService, never()).linkOauth(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("callback — 이미 연동된 계정이면 mypage?linkError=already 로 302")
+    void oauthCallback_link_alreadyLinked() throws Exception {
+        stubFront();
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("5");
+        when(jwtProvider.parse("current-access")).thenReturn(claims);
+        doThrow(new OauthAlreadyLinkedException("이미 연동됨"))
+                .when(myPageService).linkOauth(5L, "google", "c");
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("code", "c")
+                        .param("state", "nonce.google.link.5")
+                        .cookie(new Cookie(OauthWebSupport.STATE_COOKIE, "nonce.google.link.5"))
+                        .cookie(new Cookie("accessToken", "current-access")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/mypage?linkError=already"));
+    }
+
+    @Test
+    @DisplayName("callback — 다른 계정에 이미 연동돼 있으면 conflictUserId 포함 302")
+    void oauthCallback_link_linkedToOtherAccount() throws Exception {
+        stubFront();
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("5");
+        when(jwtProvider.parse("current-access")).thenReturn(claims);
+        doThrow(new OauthLinkedToOtherAccountException("다른 계정에 연동됨", 42L))
+                .when(myPageService).linkOauth(5L, "google", "c");
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("code", "c")
+                        .param("state", "nonce.google.link.5")
+                        .cookie(new Cookie(OauthWebSupport.STATE_COOKIE, "nonce.google.link.5"))
+                        .cookie(new Cookie("accessToken", "current-access")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location",
+                        "https://front.test/mypage?linkError=other_account&conflictUserId=42&provider=google"));
+    }
+
+    @Test
+    @DisplayName("callback — 그룹 관리자 계정이면 mypage?linkError=manager_account 로 302")
+    void oauthCallback_link_managerGroupExists() throws Exception {
+        stubFront();
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("5");
+        when(jwtProvider.parse("current-access")).thenReturn(claims);
+        doThrow(new ManagerGroupExistsException("그룹 관리자"))
+                .when(myPageService).linkOauth(5L, "google", "c");
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("code", "c")
+                        .param("state", "nonce.google.link.5")
+                        .cookie(new Cookie(OauthWebSupport.STATE_COOKIE, "nonce.google.link.5"))
+                        .cookie(new Cookie("accessToken", "current-access")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/mypage?linkError=manager_account"));
+    }
+
+    @Test
+    @DisplayName("callback — 연동 중 알 수 없는 오류면 mypage?linkError=1 로 302")
+    void oauthCallback_link_unknownError() throws Exception {
+        stubFront();
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("5");
+        when(jwtProvider.parse("current-access")).thenReturn(claims);
+        doThrow(new RuntimeException("boom"))
+                .when(myPageService).linkOauth(5L, "google", "c");
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("code", "c")
+                        .param("state", "nonce.google.link.5")
+                        .cookie(new Cookie(OauthWebSupport.STATE_COOKIE, "nonce.google.link.5"))
+                        .cookie(new Cookie("accessToken", "current-access")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/mypage?linkError=1"));
+    }
+
+    @Test
+    @DisplayName("callback — 로그인 성공이면 프론트 /oauth/complete 로 302 + 토큰 쿠키")
+    void oauthCallback_login_success() throws Exception {
+        stubFront();
+        when(userAuthenticationService.oauthLogin("google", "c"))
+                .thenReturn(UserLoginResult.success("acc", "ref"));
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("code", "c")
+                        .param("state", "nonce.google")
+                        .cookie(new Cookie(OauthWebSupport.STATE_COOKIE, "nonce.google")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/oauth/complete"))
+                .andExpect(header().exists("Set-Cookie"));
+    }
+
+    @Test
+    @DisplayName("callback — 로그인 시 탈퇴 복구 대기 계정이면 /reactivate 로 302")
+    void oauthCallback_login_pendingRestore() throws Exception {
+        stubFront();
+        when(userAuthenticationService.oauthLogin("google", "c"))
+                .thenReturn(UserLoginResult.pendingRestore());
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("code", "c")
+                        .param("state", "nonce.google")
+                        .cookie(new Cookie(OauthWebSupport.STATE_COOKIE, "nonce.google")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/reactivate"));
+    }
+
+    @Test
+    @DisplayName("callback — 로그인 시 이미 가입된 이메일이면 email_taken 오류로 302")
+    void oauthCallback_login_emailAlreadyRegistered() throws Exception {
+        stubFront();
+        when(userAuthenticationService.oauthLogin("google", "c"))
+                .thenThrow(new EmailAlreadyRegisteredException("이미 가입된 이메일"));
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("code", "c")
+                        .param("state", "nonce.google")
+                        .cookie(new Cookie(OauthWebSupport.STATE_COOKIE, "nonce.google")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/login?oauthError=email_taken"));
+    }
+
+    @Test
+    @DisplayName("callback — 로그인 중 알 수 없는 오류면 오류로 302")
+    void oauthCallback_login_unknownError() throws Exception {
+        stubFront();
+        when(userAuthenticationService.oauthLogin("google", "c"))
+                .thenThrow(new RuntimeException("boom"));
+
+        mvc.perform(get("/api/v1/auth/oauth/callback")
+                        .param("code", "c")
+                        .param("state", "nonce.google")
+                        .cookie(new Cookie(OauthWebSupport.STATE_COOKIE, "nonce.google")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://front.test/login?oauthError=1"));
     }
 }

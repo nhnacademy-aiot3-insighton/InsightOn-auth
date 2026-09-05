@@ -178,4 +178,14 @@ class AdminUserServiceImplTest {
 
         verify(userAuthenticationService).forceLogout(1L);
     }
+
+    @Test
+    @DisplayName("findAssignableRoles - Role enum 전체를 응답으로 변환")
+    void findAssignableRoles() {
+        List<com.nhnacademy.insightonauth.dto.admin.RoleResponse> roles =
+                adminUserService.findAssignableRoles();
+
+        assertThat(roles).extracting(com.nhnacademy.insightonauth.dto.admin.RoleResponse::name)
+                .containsExactlyInAnyOrder("ADMIN", "MEMBER");
+    }
 }
