@@ -58,7 +58,7 @@ class JwtProviderTest {
     }
 
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
         redisService = mock(RedisService.class);
         jwtProvider = new JwtProvider(privateKeyB64, publicKeyB64, "test-key-v1",
                 Duration.ofMinutes(15), Duration.ofDays(15), redisService);
@@ -130,7 +130,7 @@ class JwtProviderTest {
 
     @Test
     @DisplayName("parse — 만료된 토큰이면 JwtException")
-    void parse_expired() throws Exception {
+    void parse_expired() {
         JwtProvider shortLived = new JwtProvider(privateKeyB64, publicKeyB64, "test-key-v1",
                 Duration.ofSeconds(-1), Duration.ofDays(1), redisService);
         String token = shortLived.createAccessToken(1L, List.of("MEMBER"), "n");

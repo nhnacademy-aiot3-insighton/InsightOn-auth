@@ -1,6 +1,7 @@
 package com.nhnacademy.insightonauth.client.impl;
 
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
+import com.nhnacademy.insightonauth.exception.external.OauthProviderResponseException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import org.springframework.web.client.RestClient;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
@@ -57,5 +59,31 @@ class GoogleOauthClientTest {
         assertThat(userInfo.email()).isEqualTo("test@gmail.com");
         assertThat(userInfo.name()).isEqualTo("Test User");
         assertThat(userInfo.providerId()).isEqualTo("google-sub-id");
+    }
+
+    @Test
+    @DisplayName("getUserInfo - 액세스 토큰 응답이 없으면 예외")
+    void getUserInfo_nullTokenResponse() {
+        when(restClient.post().uri(anyString()).contentType(any()).body(any(Object.class)).retrieve().body(Map.class))
+                .thenReturn(null);
+
+        assertThatThrownBy(() -> googleOauthClient.getUserInfo("auth-code"))
+                .isInstanceOf(OauthProviderResponseException.class);
+    }
+
+    @Test
+    @DisplayName("getUserInfo - 사용자 정보 응답이 없으면 예외")
+    void getUserInfo_nullUserInfoResponse() {
+        RestClient.RequestHeadersUriSpec getUriSpec = mock(RestClient.RequestHeadersUriSpec.class);
+        when(restClient.get()).thenReturn(getUriSpec);
+        RestClient.RequestHeadersSpec headersSpec = mock(RestClient.RequestHeadersSpec.class);
+        when(getUriSpec.uri(anyString())).thenReturn(headersSpec);
+        when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
+        RestClient.ResponseSpec responseSpec = mock(RestClient.ResponseSpec.class);
+        when(headersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.body(Map.class)).thenReturn(null);
+
+        assertThatThrownBy(() -> googleOauthClient.getUserInfo("auth-code"))
+                .isInstanceOf(OauthProviderResponseException.class);
     }
 }
