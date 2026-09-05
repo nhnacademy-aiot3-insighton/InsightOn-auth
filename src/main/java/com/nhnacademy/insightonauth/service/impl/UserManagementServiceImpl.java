@@ -32,6 +32,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class UserManagementServiceImpl implements UserManagementService {
 
+    private static final String USER_NOT_FOUND_MESSAGE = "유저를 찾을 수 없습니다.";
+
     private final UserRepository userRepository;
     private final UserCredentialService userCredentialService;
     private final UserRoleService userRoleService;
@@ -71,14 +73,14 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Transactional(readOnly = true)
     public User findById(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND_MESSAGE));
     }
 
     @Override
     @Transactional(readOnly = true)
     public User findByEmail(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND_MESSAGE));
     }
 
     @Override
@@ -241,7 +243,7 @@ public class UserManagementServiceImpl implements UserManagementService {
         String normalized = PhoneNumberUtil.normalize(phoneNumber);
 
         User user = userRepository.findByUserNameAndPhoneNumber(userName, normalized)
-                .orElseThrow(() -> new UserNotFoundException("유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND_MESSAGE));
 
         String email = user.getEmail();
         if (!email.contains("@")) {
