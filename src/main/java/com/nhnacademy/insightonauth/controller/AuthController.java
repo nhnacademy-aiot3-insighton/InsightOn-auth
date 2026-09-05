@@ -40,6 +40,9 @@ import java.util.UUID;
 public class AuthController {
 
     private static final String X_USER_ID = "X-User-Id";
+    private static final String PENDING_RESTORE_STATUS = "PENDING_RESTORE";
+    private static final String LOGIN_OAUTH_ERROR_PATH = "/login?oauthError=1";
+    private static final String MYPAGE_LINK_ERROR_PATH = "/mypage?linkError=1";
 
     private final UserAuthenticationService userAuthenticationService;
     private final UserEmailService userEmailService;
@@ -99,7 +102,7 @@ public class AuthController {
 
         // 탈퇴 후 복구 가능 기간 내 계정 — 로그인 성공이 아니라 "복구 안내" 상태.
         // accessToken 이 없으므로 admin 체크 대상이 아니다.
-        if ("PENDING_RESTORE".equals(result.status())) {
+        if (PENDING_RESTORE_STATUS.equals(result.status())) {
             return ResponseEntity.ok(UserLoginResponse.pendingRestore());
         }
 
@@ -131,7 +134,7 @@ public class AuthController {
         UserLoginResult result = userAuthenticationService.oauthLogin(provider, request.code());
 
         // 탈퇴 후 복구 가능 기간 내 계정 — 로그인 성공이 아니라 "복구 안내" 상태.
-        if ("PENDING_RESTORE".equals(result.status())) {
+        if (PENDING_RESTORE_STATUS.equals(result.status())) {
             return ResponseEntity.ok(UserLoginResponse.pendingRestore());
         }
 
@@ -147,7 +150,7 @@ public class AuthController {
     @GetMapping("/oauth/authorize/{provider}")
     public ResponseEntity<Void> oauthAuthorize(@PathVariable String provider) {
         if (!oauthWebSupport.supports(provider)) {
-            return redirect(oauthWebSupport.front("/login?oauthError=1"), null);
+            return redirect(oauthWebSupport.front(LOGIN_OAUTH_ERROR_PATH), null);
         }
         String state = UUID.randomUUID() + "." + provider;
         return ResponseEntity.status(HttpStatus.FOUND)
@@ -169,7 +172,7 @@ public class AuthController {
 
         Long userId = parseUserId(accessToken);
         if (!oauthWebSupport.supports(provider) || userId == null) {
-            return redirect(oauthWebSupport.front("/mypage?linkError=1"), null);
+            return redirect(oauthWebSupport.front(MYPAGE_LINK_ERROR_PATH), null);
         }
         // 연동 대상 userId 를 state 에 실어 둔다. state 는 콜백에서 서버가 심은 oauthState 쿠키와
         // 통째로 대조되므로(위조 불가), 콜백은 이 값을 "연동을 시작한 유저"로 신뢰할 수 있다.
@@ -196,7 +199,7 @@ public class AuthController {
         // provider 취소(error=access_denied)·code 누락도 연동이었으면 마이페이지로 돌려보낸다.
         // state 형식: 로그인 "<uuid>.<provider>", 연동 "<uuid>.<provider>.link.<userId>" — nonce·provider 에 점 없음.
         boolean link = expectedState != null && expectedState.contains(".link");
-        String errorRedirect = link ? "/mypage?linkError=1" : "/login?oauthError=1";
+        String errorRedirect = link ? MYPAGE_LINK_ERROR_PATH : LOGIN_OAUTH_ERROR_PATH;
 
         if (error != null || code == null || state == null
                 || expectedState == null || !state.equals(expectedState)) {
@@ -235,14 +238,14 @@ public class AuthController {
                 return redirect(oauthWebSupport.front("/mypage?linkError=manager_account"), expiredState);
             } catch (RuntimeException e) {
                 log.warn("[OAuth] 연동/병합 실패: {}", e.getMessage());
-                return redirect(oauthWebSupport.front("/mypage?linkError=1"), expiredState);
+                return redirect(oauthWebSupport.front(MYPAGE_LINK_ERROR_PATH), expiredState);
             }
         }
 
         try {
             UserLoginResult result = userAuthenticationService.oauthLogin(provider, code);
 
-            if ("PENDING_RESTORE".equals(result.status())) {
+            if (PENDING_RESTORE_STATUS.equals(result.status())) {
                 return redirect(oauthWebSupport.front("/reactivate"), expiredState);
             }
 
@@ -257,7 +260,7 @@ public class AuthController {
             return redirect(oauthWebSupport.front("/login?oauthError=email_taken"), expiredState);
         } catch (RuntimeException e) {
             log.warn("[OAuth] 소셜 로그인 실패: {}", e.getMessage());
-            return redirect(oauthWebSupport.front("/login?oauthError=1"), expiredState);
+            return redirect(oauthWebSupport.front(LOGIN_OAUTH_ERROR_PATH), expiredState);
         }
     }
 
