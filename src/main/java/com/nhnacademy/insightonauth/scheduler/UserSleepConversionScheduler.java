@@ -22,6 +22,9 @@ public class UserSleepConversionScheduler {
     private final UserManagementService userManagementService;
 
     @Scheduled(cron = "0 0 2 * * *")   // 매일 새벽 2시
+    // Redisson RLock.unlock()은 확인~해제 사이 워치독 갱신 실패로 소유권을 잃으면
+    // IllegalMonitorStateException을 던지는 게 공식 동작이라, 그 경우만 로그로 흡수한다.
+    @SuppressWarnings("java:S2235")
     public void convertInactiveUsersToSleep() {
         // 이중화된 여러 인스턴스가 동시에 이 배치를 실행하지 않도록 Redisson 분산 락 사용.
         // 워치독이 작업 시간에 맞춰 락 TTL을 자동 갱신하므로, 배치가 오래 걸려도
@@ -66,7 +69,7 @@ public class UserSleepConversionScheduler {
                 } catch (IllegalMonitorStateException e) {
                     // 확인~해제 사이 워치독 갱신 실패로 락이 만료돼 소유권을 잃은 경우
                     log.warn("락 해제 실패 - 이미 소유권을 상실함 (TTL 만료 추정). lockKey={}",
-                            RedisKey.HARD_DELETE_SCHEDULER_LOCK.getPrefix());
+                            RedisKey.SLEEP_CONVERSION_SCHEDULER_LOCK.getPrefix());
                 }
             }
         }
