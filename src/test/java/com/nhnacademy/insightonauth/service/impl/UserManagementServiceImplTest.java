@@ -1,6 +1,5 @@
 package com.nhnacademy.insightonauth.service.impl;
 
-import com.nhnacademy.insightonauth.email.EmailService;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
@@ -38,7 +37,7 @@ class UserManagementServiceImplTest {
     @Mock private UserCredentialService userCredentialService;
     @Mock private UserRoleService userRoleService;
     @Mock private OauthService oauthService;
-    @Mock private EmailService emailService;
+    @Mock private EmailVerificationService emailVerificationService;
     @Mock private RedisService redisService;
     @Mock private TokenBlacklistService tokenBlacklistService;
     @Mock private TokenService tokenService;
@@ -87,7 +86,7 @@ class UserManagementServiceImplTest {
         userManagementService.createUser(
                 "test@test.com", "pw", "test", "01012345678", Role.MEMBER, "token");
 
-        verify(emailService).emailVerifyCheck("test@test.com", "token");
+        verify(emailVerificationService).emailVerifyCheck("test@test.com", "token");
         verify(userRepository).save(any(User.class));
         verify(userCredentialService).create(any(User.class), eq("pw"));
         verify(userRoleService).create(any(User.class), eq(Role.MEMBER));
