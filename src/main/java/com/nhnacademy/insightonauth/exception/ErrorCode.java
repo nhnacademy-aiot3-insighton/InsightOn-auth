@@ -47,7 +47,9 @@ public enum ErrorCode {
 
     REDIS_OPERATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE),
 
-    INVALID_EMAIL_FORMAT(HttpStatus.BAD_REQUEST);
+    INVALID_EMAIL_FORMAT(HttpStatus.BAD_REQUEST),
+
+    OAUTH_PROVIDER_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY);
 
     private final HttpStatus status;
 

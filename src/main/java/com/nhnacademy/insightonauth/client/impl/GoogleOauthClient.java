@@ -2,6 +2,7 @@ package com.nhnacademy.insightonauth.client.impl;
 
 import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
+import com.nhnacademy.insightonauth.exception.external.OauthProviderResponseException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
@@ -57,6 +58,10 @@ public class GoogleOauthClient implements OauthClient {
                 .retrieve()
                 .body(Map.class);
 
+        if (response == null) {
+            throw new OauthProviderResponseException("Google 액세스 토큰 응답이 비어 있습니다.");
+        }
+
         return (String) response.get("access_token");
     }
 
@@ -66,6 +71,10 @@ public class GoogleOauthClient implements OauthClient {
                 .header("Authorization", "Bearer " + accessToken)
                 .retrieve()
                 .body(Map.class);
+
+        if (userInfo == null) {
+            throw new OauthProviderResponseException("Google 사용자 정보 응답이 비어 있습니다.");
+        }
 
         return new OauthUserInfo(
                 (String) userInfo.get("email"),

@@ -3,6 +3,7 @@ package com.nhnacademy.insightonauth.client.impl;
 import com.nhnacademy.insightonauth.client.OauthClient;
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.exception.email.EmailNotFoundException;
+import com.nhnacademy.insightonauth.exception.external.OauthProviderResponseException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
@@ -58,6 +59,10 @@ public class GithubOauthClient implements OauthClient {
                 .retrieve()
                 .body(Map.class);
 
+        if (response == null) {
+            throw new OauthProviderResponseException("GitHub 액세스 토큰 응답이 비어 있습니다.");
+        }
+
         return (String) response.get("access_token");
     }
 
@@ -67,6 +72,10 @@ public class GithubOauthClient implements OauthClient {
                 .header("Authorization", "Bearer " + accessToken)
                 .retrieve()
                 .body(Map.class);
+
+        if (userInfo == null) {
+            throw new OauthProviderResponseException("GitHub 사용자 정보 응답이 비어 있습니다.");
+        }
 
         String email = requestPrimaryEmail(accessToken);
 
@@ -91,6 +100,10 @@ public class GithubOauthClient implements OauthClient {
                 .header("Authorization", "Bearer " + accessToken)
                 .retrieve()
                 .body(List.class);
+
+        if (emails == null) {
+            throw new OauthProviderResponseException("GitHub 이메일 목록 응답이 비어 있습니다.");
+        }
 
         // primary git에서 대표로 지정된 이메일 가져옴, verified 그 중에 인증된거 가져옴
         return emails.stream()
