@@ -2,6 +2,7 @@ package com.nhnacademy.insightonauth.client.impl;
 
 import com.nhnacademy.insightonauth.dto.oauth.OauthUserInfo;
 import com.nhnacademy.insightonauth.exception.email.EmailNotFoundException;
+import com.nhnacademy.insightonauth.exception.external.OauthProviderResponseException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -101,5 +102,43 @@ class GithubOauthClientTest {
 
         assertThatThrownBy(() -> githubOauthClient.getUserInfo("auth-code"))
                 .isInstanceOf(EmailNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("getUserInfo - 액세스 토큰 응답이 없으면 예외")
+    void getUserInfo_nullTokenResponse() {
+        RestClient.RequestBodyUriSpec postUriSpec = mock(RestClient.RequestBodyUriSpec.class);
+        when(restClient.post()).thenReturn(postUriSpec);
+        RestClient.RequestBodySpec bodySpec = mock(RestClient.RequestBodySpec.class);
+        when(postUriSpec.uri(anyString())).thenReturn(bodySpec);
+        when(bodySpec.header(anyString(), anyString())).thenReturn(bodySpec);
+        when(bodySpec.contentType(any())).thenReturn(bodySpec);
+        when(bodySpec.body(any(Object.class))).thenReturn(bodySpec);
+        RestClient.ResponseSpec tokenResponseSpec = mock(RestClient.ResponseSpec.class);
+        when(bodySpec.retrieve()).thenReturn(tokenResponseSpec);
+        when(tokenResponseSpec.body(Map.class)).thenReturn(null);
+
+        assertThatThrownBy(() -> githubOauthClient.getUserInfo("auth-code"))
+                .isInstanceOf(OauthProviderResponseException.class);
+    }
+
+    @Test
+    @DisplayName("getUserInfo - 사용자 정보 응답이 없으면 예외")
+    void getUserInfo_nullUserInfoResponse() {
+        stubGet("https://api.github.com/user", Map.class, null);
+
+        assertThatThrownBy(() -> githubOauthClient.getUserInfo("auth-code"))
+                .isInstanceOf(OauthProviderResponseException.class);
+    }
+
+    @Test
+    @DisplayName("getUserInfo - 이메일 목록 응답이 없으면 예외")
+    void getUserInfo_nullEmailsResponse() {
+        stubGet("https://api.github.com/user", Map.class,
+                Map.of("name", "Octo Cat", "id", 12345));
+        stubGet("https://api.github.com/user/emails", List.class, null);
+
+        assertThatThrownBy(() -> githubOauthClient.getUserInfo("auth-code"))
+                .isInstanceOf(OauthProviderResponseException.class);
     }
 }

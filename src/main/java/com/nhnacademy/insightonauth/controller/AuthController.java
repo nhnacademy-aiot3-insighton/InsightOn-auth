@@ -41,7 +41,12 @@ public class AuthController {
 
     private static final String X_USER_ID = "X-User-Id";
     private static final String PENDING_RESTORE_STATUS = "PENDING_RESTORE";
+
+    // 환경별로 달라지는 건 도메인뿐이고(app.front-url, oauthWebSupport.front()가 붙여줌),
+    // 이 경로 자체는 프론트 라우팅 계약이라 프로퍼티로 뺄 대상이 아니다.
+    @SuppressWarnings("java:S1075")
     private static final String LOGIN_OAUTH_ERROR_PATH = "/login?oauthError=1";
+    @SuppressWarnings("java:S1075")
     private static final String MYPAGE_LINK_ERROR_PATH = "/mypage?linkError=1";
 
     private final UserAuthenticationService userAuthenticationService;
