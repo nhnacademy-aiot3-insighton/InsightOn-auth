@@ -216,5 +216,20 @@ class UserEmailServiceImplTest {
         userEmailService.passwordResetConfirm("token", "newPw");
 
         verify(userCredentialService).updatePassword(any(), eq(user), eq("newPw"));
+        verify(emailVerificationService).consumePasswordResetToken("token", "test@test.com");
+    }
+
+    @Test
+    @DisplayName("passwordResetConfirm - 비밀번호 변경 실패 시 토큰을 소모하지 않는다 (재시도 가능)")
+    void passwordResetConfirm_updateFails_tokenNotConsumed() {
+        when(emailVerificationService.emailTokenVerify("token")).thenReturn("test@test.com");
+        when(userManagementService.findByEmail("test@test.com")).thenReturn(user);
+        doThrow(new SameAsOldPasswordException("새 비밀번호는 기존 비밀번호와 달라야 합니다."))
+                .when(userCredentialService).updatePassword(any(), eq(user), eq("newPw"));
+
+        assertThatThrownBy(() -> userEmailService.passwordResetConfirm("token", "newPw"))
+                .isInstanceOf(SameAsOldPasswordException.class);
+
+        verify(emailVerificationService, never()).consumePasswordResetToken(anyString(), anyString());
     }
 }

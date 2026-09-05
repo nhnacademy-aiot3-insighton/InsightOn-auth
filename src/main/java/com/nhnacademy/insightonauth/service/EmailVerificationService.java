@@ -14,5 +14,7 @@ public interface EmailVerificationService {
 
     String emailTokenVerify(String token);
 
+    void consumePasswordResetToken(String token, String email);
+
     void emailReactiveVerifyCheck(String email, String inputCode);
 }

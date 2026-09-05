@@ -164,5 +164,8 @@ public class UserEmailServiceImpl implements UserEmailService {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         userCredentialService.updatePassword(now, user, newPassword);
         user.setUpdatedAt(now);
+
+        // 비밀번호 변경이 성공한 뒤에만 토큰을 소모 — 실패(동일 비밀번호 등) 시 같은 링크로 재시도 가능
+        emailVerificationService.consumePasswordResetToken(token, email);
     }
 }
