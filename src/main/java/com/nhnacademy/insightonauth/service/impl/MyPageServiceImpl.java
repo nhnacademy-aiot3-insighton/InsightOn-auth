@@ -131,6 +131,13 @@ public class MyPageServiceImpl implements MyPageService {
 
         User primaryUser = userManagementService.findById(primaryUserId);
 
+        // confirmMerge는 linkOauth의 사전 검사를 거치지 않고 바로 여기로 오므로, primary가 이미
+        // 같은 provider를 갖고 있으면 재연결 시 DB 유니크 제약 위반(정제 안 된 예외)이 아니라
+        // 여기서 명확히 막는다.
+        if (oauthService.hasProviderLinked(primaryUser, provider)) {
+            throw new OauthAlreadyLinkedException("이미 " + provider + " 계정이 연동되어 있습니다.");
+        }
+
         // 2차 확인 - secondaryUser가 정말 이 provider/providerUserId를 갖고 있는지 검증
         Oauth secondaryOauth = oauthService.findByProviderAndProviderUserId(provider, providerUserId)
                 .orElseThrow(() -> new OauthNotFoundException("연동 정보를 찾을 수 없습니다."));

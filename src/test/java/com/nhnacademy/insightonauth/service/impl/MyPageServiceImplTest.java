@@ -201,6 +201,18 @@ class MyPageServiceImplTest {
     }
 
     @Test
+    @DisplayName("mergeAccount - primary가 이미 같은 provider 연동돼 있으면 예외 (DB 유니크 위반 대신 명확히 차단)")
+    void mergeAccount_primaryAlreadyHasProvider() {
+        when(userManagementService.findById(1L)).thenReturn(user);
+        when(oauthService.hasProviderLinked(user, "google")).thenReturn(true);
+
+        assertThatThrownBy(() -> myPageService.mergeAccount(1L, 2L, "google", "pid-1"))
+                .isInstanceOf(OauthAlreadyLinkedException.class);
+
+        verify(oauthService, never()).findByProviderAndProviderUserId(anyString(), anyString());
+    }
+
+    @Test
     @DisplayName("mergeAccount - 연동 정보가 없으면 예외")
     void mergeAccount_oauthNotFound() {
         when(userManagementService.findById(1L)).thenReturn(user);
