@@ -22,6 +22,9 @@ public class UserHardDeleteScheduler {
     private final UserManagementService userManagementService;
 
     @Scheduled(cron = "0 0 1 * * *")   // 매일 새벽 1시
+    // Redisson RLock.unlock()은 확인~해제 사이 워치독 갱신 실패로 소유권을 잃으면
+    // IllegalMonitorStateException을 던지는 게 공식 동작이라, 그 경우만 로그로 흡수한다.
+    @SuppressWarnings("java:S2235")
     public void hardDeleteExpiredUsers() {
         RLock lock = redissonClient.getLock(RedisKey.HARD_DELETE_SCHEDULER_LOCK.getPrefix());
 

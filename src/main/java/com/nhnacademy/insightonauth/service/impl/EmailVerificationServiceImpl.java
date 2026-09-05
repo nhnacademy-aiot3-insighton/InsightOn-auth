@@ -22,6 +22,9 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     // SecureRandom 생성 비용이 커서 매번 새로 만들지 않고 재사용한다 (스레드 안전이라 공유 가능).
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
+    private static final String TEMPORARILY_LOCKED_MESSAGE = "인증 시도가 5회 초과되어 5분간 잠겼습니다.";
+    private static final String INVALID_CODE_MESSAGE = "인증 코드가 올바르지 않거나 만료되었습니다.";
+
     private final SmtpMailSender mailSender;
     private final RedisService redisService;
 
@@ -70,14 +73,14 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     @Override
     public String emailCodeVerify(String email, String inputCode) {
         if (redisService.hasKey(RedisKey.VERIFY_FAIL_LOCK.getPrefix() + email)) {
-            throw new VerificationTemporarilyLockedException("인증 시도가 5회 초과되어 5분간 잠겼습니다.");
+            throw new VerificationTemporarilyLockedException(TEMPORARILY_LOCKED_MESSAGE);
         }
 
         String savedCode = redisService.get(RedisKey.VERIFY.getPrefix() + email);
 
         if (savedCode == null || !savedCode.equals(inputCode)) {
             increaseVerifyFailCount(RedisKey.VERIFY_FAIL, RedisKey.VERIFY_FAIL_LOCK, email);
-            throw new InvalidVerificationCodeException("인증 코드가 올바르지 않거나 만료되었습니다.");
+            throw new InvalidVerificationCodeException(INVALID_CODE_MESSAGE);
         }
 
         redisService.delete(RedisKey.VERIFY_FAIL.getPrefix() + email);
@@ -93,7 +96,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
         String savedToken = redisService.get(RedisKey.VERIFIED.getPrefix() + email);
 
         if (savedToken == null || !savedToken.equals(inputToken)) {
-            throw new InvalidVerificationCodeException("인증 코드가 올바르지 않거나 만료되었습니다.");
+            throw new InvalidVerificationCodeException(INVALID_CODE_MESSAGE);
         }
 
         redisService.delete(RedisKey.VERIFIED.getPrefix() + email);
@@ -127,14 +130,14 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     @Override
     public void emailReactiveVerifyCheck(String email, String inputCode) {
         if (redisService.hasKey(RedisKey.REACTIVE_VERIFY_FAIL_LOCK.getPrefix() + email)) {
-            throw new VerificationTemporarilyLockedException("인증 시도가 5회 초과되어 5분간 잠겼습니다.");
+            throw new VerificationTemporarilyLockedException(TEMPORARILY_LOCKED_MESSAGE);
         }
 
         String savedCode = redisService.get(RedisKey.REACTIVE.getPrefix() + email);
 
         if (savedCode == null || !savedCode.equals(inputCode)) {
             increaseVerifyFailCount(RedisKey.REACTIVE_VERIFY_FAIL, RedisKey.REACTIVE_VERIFY_FAIL_LOCK, email);
-            throw new InvalidVerificationCodeException("인증 코드가 올바르지 않거나 만료되었습니다.");
+            throw new InvalidVerificationCodeException(INVALID_CODE_MESSAGE);
         }
 
         redisService.delete(RedisKey.REACTIVE_VERIFY_FAIL.getPrefix() + email);
@@ -148,7 +151,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
         if (failCount >= 5) {
             redisService.delete(failKey.getPrefix() + email);
             redisService.set(lockKey.getPrefix() + email, "locked", Duration.ofMinutes(5));
-            throw new VerificationTemporarilyLockedException("인증 시도가 5회 초과되어 5분간 잠겼습니다.");
+            throw new VerificationTemporarilyLockedException(TEMPORARILY_LOCKED_MESSAGE);
         }
     }
 }

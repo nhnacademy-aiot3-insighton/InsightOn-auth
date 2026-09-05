@@ -118,9 +118,9 @@ class UserCredentialServiceImplTest {
         when(userCredentialRepository.findByUser(user)).thenReturn(Optional.of(userCredential));
         when(userCredential.getPasswordHash()).thenReturn("old-hash");
         when(passwordEncoder.matches("samePw", "old-hash")).thenReturn(true);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-        assertThatThrownBy(() -> userCredentialService.updatePassword(
-                OffsetDateTime.now(ZoneOffset.UTC), user, "samePw"))
+        assertThatThrownBy(() -> userCredentialService.updatePassword(now, user, "samePw"))
                 .isInstanceOf(SameAsOldPasswordException.class);
         verify(userCredential, never()).changePassword(any(), any());
     }

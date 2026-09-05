@@ -116,7 +116,7 @@ class JwtProviderTest {
 
         Claims c = jwtProvider.parse(token);
         assertThat(c.getSubject()).isEqualTo("1");
-        verify(redisService).set(eq("refresh:1"), eq(c.getId()), eq(Duration.ofDays(15)));
+        verify(redisService).set("refresh:1", c.getId(), Duration.ofDays(15));
     }
 
     @Test

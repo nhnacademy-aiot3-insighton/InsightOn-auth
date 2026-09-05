@@ -75,9 +75,11 @@ class UserRoleRepositoryTest {
     @Test
     @DisplayName("다른 사용자 역할 미포함 확인")
     void existsByUserAndRole_doesNotMixOtherUsersRole() {
-        boolean exists = userRoleRepository.existsByUserAndRole(user1, Role.ADMIN);
+        boolean user2HasAdmin = userRoleRepository.existsByUserAndRole(user2, Role.ADMIN);
+        boolean user1HasAdmin = userRoleRepository.existsByUserAndRole(user1, Role.ADMIN);
 
-        assertThat(exists).isFalse();
+        assertThat(user2HasAdmin).isTrue();
+        assertThat(user1HasAdmin).isFalse();
     }
 
     @Test

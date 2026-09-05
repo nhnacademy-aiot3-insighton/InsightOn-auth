@@ -31,9 +31,10 @@ class LoginResponderTest {
 
         assertThat(response.getBody().accessToken()).isEqualTo("access-token");
         String setCookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
-        assertThat(setCookie).contains("refreshToken=refresh-token");
-        assertThat(setCookie).contains("HttpOnly");
-        assertThat(setCookie).contains("Secure");
+        assertThat(setCookie)
+                .contains("refreshToken=refresh-token")
+                .contains("HttpOnly")
+                .contains("Secure");
     }
 
     @Test
