@@ -77,9 +77,11 @@ class JwtProviderTest {
     @DisplayName("private key 내용이 올바른 키 형식이 아니면 JwtKeyLoadException")
     void invalidPrivateKey_throwsJwtKeyLoadException() {
         String garbagePrivateKey = garbageKeyB64("-----BEGIN PRIVATE KEY-----", "-----END PRIVATE KEY-----");
+        Duration accessValidity = Duration.ofMinutes(15);
+        Duration refreshValidity = Duration.ofDays(15);
 
         assertThatThrownBy(() -> new JwtProvider(garbagePrivateKey, publicKeyB64, "test-key-v1",
-                Duration.ofMinutes(15), Duration.ofDays(15), redisService))
+                accessValidity, refreshValidity, redisService))
                 .isInstanceOf(JwtKeyLoadException.class);
     }
 
@@ -87,9 +89,11 @@ class JwtProviderTest {
     @DisplayName("public key 내용이 올바른 키 형식이 아니면 JwtKeyLoadException")
     void invalidPublicKey_throwsJwtKeyLoadException() {
         String garbagePublicKey = garbageKeyB64("-----BEGIN PUBLIC KEY-----", "-----END PUBLIC KEY-----");
+        Duration accessValidity = Duration.ofMinutes(15);
+        Duration refreshValidity = Duration.ofDays(15);
 
         assertThatThrownBy(() -> new JwtProvider(privateKeyB64, garbagePublicKey, "test-key-v1",
-                Duration.ofMinutes(15), Duration.ofDays(15), redisService))
+                accessValidity, refreshValidity, redisService))
                 .isInstanceOf(JwtKeyLoadException.class);
     }
 
