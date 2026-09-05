@@ -199,12 +199,11 @@ public class AuthController {
         // provider 취소(error=access_denied)·code 누락도 연동이었으면 마이페이지로 돌려보낸다.
         // state 형식: 로그인 "<uuid>.<provider>", 연동 "<uuid>.<provider>.link.<userId>" — nonce·provider 에 점 없음.
         boolean link = expectedState != null && expectedState.contains(".link");
-        String errorRedirect = link ? MYPAGE_LINK_ERROR_PATH : LOGIN_OAUTH_ERROR_PATH;
+        boolean stateMatched = state != null && state.equals(expectedState);
 
-        if (error != null || code == null || state == null
-                || expectedState == null || !state.equals(expectedState)) {
-            log.warn("[OAuth] 콜백 검증 실패: error={}, link={}, stateMatched={}",
-                    error, link, state != null && state.equals(expectedState));
+        if (error != null || code == null || expectedState == null || !stateMatched) {
+            String errorRedirect = link ? MYPAGE_LINK_ERROR_PATH : LOGIN_OAUTH_ERROR_PATH;
+            log.warn("[OAuth] 콜백 검증 실패: error={}, link={}, stateMatched={}", error, link, stateMatched);
             return redirect(oauthWebSupport.front(errorRedirect), expiredState);
         }
 
@@ -212,36 +211,44 @@ public class AuthController {
         String provider = parts[1];
 
         if (link) {
-            // state 의 userId(연동 시작 유저) 와 콜백 시점 accessToken 쿠키의 userId(현재 로그인 유저) 가
-            // 같아야만 연동을 진행한다. 동의 화면을 띄운 뒤 다른 탭에서 계정을 바꾸면 여기서 걸린다.
-            Long stateUserId = parts.length > 3 ? toUserId(parts[3]) : null;
-            Long currentUserId = parseUserId(accessToken);
-            if (stateUserId == null || !stateUserId.equals(currentUserId)) {
-                return redirect(oauthWebSupport.front("/mypage?linkError=auth"), expiredState);
-            }
-            // state: "<nonce>.<provider>.link.<userId>" 뒤에 병합 확인 왕복이면 ".merge.<secondaryUserId>" 가 더 붙는다.
-            Long mergeSecondaryUserId = parts.length > 5 && "merge".equals(parts[4]) ? toUserId(parts[5]) : null;
-            try {
-                if (mergeSecondaryUserId != null) {
-                    myPageService.confirmMerge(stateUserId, mergeSecondaryUserId, provider, code);
-                    return redirect(oauthWebSupport.front("/mypage?merged=1"), expiredState);
-                }
-                myPageService.linkOauth(stateUserId, provider, code);
-                return redirect(oauthWebSupport.front("/mypage?linked=1"), expiredState);
-            } catch (OauthAlreadyLinkedException e) {
-                return redirect(oauthWebSupport.front("/mypage?linkError=already"), expiredState);
-            } catch (OauthLinkedToOtherAccountException e) {
-                return redirect(oauthWebSupport.front(
-                        "/mypage?linkError=other_account&conflictUserId=" + e.getConflictingUserId()
-                                + "&provider=" + provider), expiredState);
-            } catch (ManagerGroupExistsException e) {
-                return redirect(oauthWebSupport.front("/mypage?linkError=manager_account"), expiredState);
-            } catch (RuntimeException e) {
-                log.warn("[OAuth] 연동/병합 실패: {}", e.getMessage());
-                return redirect(oauthWebSupport.front(MYPAGE_LINK_ERROR_PATH), expiredState);
-            }
+            return handleLinkCallback(parts, provider, code, accessToken, expiredState);
         }
+        return handleLoginCallback(provider, code, expiredState);
+    }
 
+    // state 의 userId(연동 시작 유저) 와 콜백 시점 accessToken 쿠키의 userId(현재 로그인 유저) 가
+    // 같아야만 연동을 진행한다. 동의 화면을 띄운 뒤 다른 탭에서 계정을 바꾸면 여기서 걸린다.
+    private ResponseEntity<Void> handleLinkCallback(
+            String[] parts, String provider, String code, String accessToken, String expiredState) {
+        Long stateUserId = parts.length > 3 ? toUserId(parts[3]) : null;
+        Long currentUserId = parseUserId(accessToken);
+        if (stateUserId == null || !stateUserId.equals(currentUserId)) {
+            return redirect(oauthWebSupport.front("/mypage?linkError=auth"), expiredState);
+        }
+        // state: "<nonce>.<provider>.link.<userId>" 뒤에 병합 확인 왕복이면 ".merge.<secondaryUserId>" 가 더 붙는다.
+        Long mergeSecondaryUserId = parts.length > 5 && "merge".equals(parts[4]) ? toUserId(parts[5]) : null;
+        try {
+            if (mergeSecondaryUserId != null) {
+                myPageService.confirmMerge(stateUserId, mergeSecondaryUserId, provider, code);
+                return redirect(oauthWebSupport.front("/mypage?merged=1"), expiredState);
+            }
+            myPageService.linkOauth(stateUserId, provider, code);
+            return redirect(oauthWebSupport.front("/mypage?linked=1"), expiredState);
+        } catch (OauthAlreadyLinkedException e) {
+            return redirect(oauthWebSupport.front("/mypage?linkError=already"), expiredState);
+        } catch (OauthLinkedToOtherAccountException e) {
+            return redirect(oauthWebSupport.front(
+                    "/mypage?linkError=other_account&conflictUserId=" + e.getConflictingUserId()
+                            + "&provider=" + provider), expiredState);
+        } catch (ManagerGroupExistsException e) {
+            return redirect(oauthWebSupport.front("/mypage?linkError=manager_account"), expiredState);
+        } catch (RuntimeException e) {
+            log.warn("[OAuth] 연동/병합 실패: {}", e.getMessage());
+            return redirect(oauthWebSupport.front(MYPAGE_LINK_ERROR_PATH), expiredState);
+        }
+    }
+
+    private ResponseEntity<Void> handleLoginCallback(String provider, String code, String expiredState) {
         try {
             UserLoginResult result = userAuthenticationService.oauthLogin(provider, code);
 
