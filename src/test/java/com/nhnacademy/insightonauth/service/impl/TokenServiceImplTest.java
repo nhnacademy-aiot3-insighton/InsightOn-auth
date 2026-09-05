@@ -49,7 +49,7 @@ class TokenServiceImplTest {
     void issueTokens_singleRole() {
         when(userRoleService.findByUser(user)).thenReturn(List.of(new UserRole(user, Role.MEMBER)));
         when(jwtProvider.createAccessToken(1L, List.of("MEMBER"), "test")).thenReturn("accessToken");
-        when(jwtProvider.createRefreshToken(1L, List.of("MEMBER"))).thenReturn("refreshToken");
+        when(jwtProvider.createRefreshToken(1L)).thenReturn("refreshToken");
 
         UserLoginResult userLoginResult = tokenService.issueTokens(user, user.getEmail());
 
@@ -63,7 +63,7 @@ class TokenServiceImplTest {
         when(userRoleService.findByUser(user))
                 .thenReturn(List.of(new UserRole(user, Role.ADMIN), new UserRole(user, Role.MEMBER)));
         when(jwtProvider.createAccessToken(1L, List.of("ADMIN", "MEMBER"), "test")).thenReturn("accessToken");
-        when(jwtProvider.createRefreshToken(1L, List.of("ADMIN", "MEMBER"))).thenReturn("refreshToken");
+        when(jwtProvider.createRefreshToken(1L)).thenReturn("refreshToken");
 
         UserLoginResult userLoginResult = tokenService.issueTokens(user, user.getEmail());
 

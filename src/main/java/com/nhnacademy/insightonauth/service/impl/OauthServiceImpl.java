@@ -60,13 +60,6 @@ public class OauthServiceImpl implements OauthService {
         oauthRepository.deleteByUser(user);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public Oauth findOauth(User user, String provider) {
-        return oauthRepository.findByUserAndProvider(user, provider)
-                .orElseThrow(() -> new OauthNotFoundException("연동된 소셜 계정을 찾을 수 없습니다."));
-    }
-
     // 전체 삭제
     @Override
     @Transactional(readOnly = true)

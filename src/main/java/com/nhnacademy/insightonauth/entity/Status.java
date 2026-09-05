@@ -1,5 +1,8 @@
 package com.nhnacademy.insightonauth.entity;
 
+import lombok.Getter;
+
+@Getter
 public enum Status {
     ACTIVE(true, "활성", null, null),     // 활동 계정
     SLEEP(false, "휴면", "휴면 계정입니다. 재인증이 필요합니다.", "USER_SLEEP"),      // 휴면 계정
@@ -18,19 +21,4 @@ public enum Status {
         this.errorCode = errorCode;
     }
 
-    public boolean isLoginable() {
-        return loginable;
-    }
-
-    public String getLabel() {
-        return label;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public String getErrorCode() {
-        return errorCode;
-    }
 }

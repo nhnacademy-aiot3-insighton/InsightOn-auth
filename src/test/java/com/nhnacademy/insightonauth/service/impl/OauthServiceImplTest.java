@@ -118,15 +118,6 @@ class OauthServiceImplTest {
     }
 
     @Test
-    @DisplayName("findOauth - 없으면 예외")
-    void findOauth_notFound() {
-        when(oauthRepository.findByUserAndProvider(user, "google")).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> oauthService.findOauth(user, "google"))
-                .isInstanceOf(OauthNotFoundException.class);
-    }
-
-    @Test
     @DisplayName("maskByUser - 모든 연동을 마스킹하고 flush")
     void maskByUser() {
         Oauth g = oauth("google", "gid");

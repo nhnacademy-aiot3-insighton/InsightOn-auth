@@ -114,7 +114,7 @@ public class AuthController {
     // 로그아웃 — refresh 토큰 삭제 + 현재 access 토큰 블랙리스트 등록
     @PostMapping("/logout")
     public ResponseEntity<Void> doLogout(
-            @RequestHeader(name = X_USER_ID) @Valid Long userId,
+            @RequestHeader(name = X_USER_ID) Long userId,
             @RequestHeader("Authorization") String token) {
         String accessToken = token.replace("Bearer ", "");
         userAuthenticationService.logout(userId, accessToken);

@@ -14,8 +14,6 @@ public interface OauthService {
 
     void deleteAllByUser(User user);
 
-    Oauth findOauth(User user, String provider);
-
     List<Oauth> findAllByUser(User user);
 
     Optional<Oauth> findByProviderAndProviderUserId(String provider, String providerUserId);

@@ -18,12 +18,15 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class EmailVerificationServiceImpl implements EmailVerificationService {
 
+    // SecureRandom 생성 비용이 커서 매번 새로 만들지 않고 재사용한다 (스레드 안전이라 공유 가능).
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final SmtpMailSender mailSender;
     private final RedisService redisService;
 
     @Override
     public void sendVerificationCode(String email) {
-        String code = String.format("%06d", new SecureRandom().nextInt(1_000_000));
+        String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
 
         redisService.set(RedisKey.VERIFY.getPrefix() + email, code, Duration.ofMinutes(5));
 
@@ -51,7 +54,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
 
     @Override
     public void sendReactiveVerificationCode(String email) {
-        String code = String.format("%06d", new SecureRandom().nextInt(1_000_000));
+        String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
 
         redisService.set(RedisKey.REACTIVE.getPrefix() + email, code, Duration.ofMinutes(5));
 

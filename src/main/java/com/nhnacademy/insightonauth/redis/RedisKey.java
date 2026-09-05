@@ -1,5 +1,8 @@
 package com.nhnacademy.insightonauth.redis;
 
+import lombok.Getter;
+
+@Getter
 public enum RedisKey {
     // 리프레시 토큰 (userId → jti). 재발급/로그아웃 시 검증에 사용
     REFRESH("refresh:"),
@@ -83,7 +86,4 @@ public enum RedisKey {
         this.prefix = prefix;
     }
 
-    public String getPrefix() {
-        return prefix;
-    }
 }

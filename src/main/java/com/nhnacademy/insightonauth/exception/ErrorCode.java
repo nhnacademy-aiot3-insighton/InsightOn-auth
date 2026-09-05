@@ -1,7 +1,9 @@
 package com.nhnacademy.insightonauth.exception;
 
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
+@Getter
 public enum ErrorCode {
     CORE_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT),
@@ -53,7 +55,4 @@ public enum ErrorCode {
         this.status = status;
     }
 
-    public HttpStatus getStatus() {
-        return status;
-    }
 }

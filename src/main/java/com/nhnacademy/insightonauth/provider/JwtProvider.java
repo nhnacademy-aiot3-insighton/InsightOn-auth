@@ -7,9 +7,9 @@ import com.nhnacademy.insightonauth.redis.RedisService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.security.KeyFactory;
@@ -28,6 +28,7 @@ public class JwtProvider {
     private final PrivateKey privateKey;
     private final PublicKey publicKey;
     private final String keyId;
+    @Getter
     private final Duration accessValidity;
     private final Duration refreshValidity;
     private final RedisService redisService;
@@ -38,7 +39,6 @@ public class JwtProvider {
             @Value("${jwt.key-id}") String keyId,
             @Value("${jwt.access-token-validity}") Duration accessValidity,
             @Value("${jwt.refresh-token-validity}") Duration refreshValidity,
-            StringRedisTemplate redisTemplate,
             RedisService redisService) throws Exception {
         this.privateKey = loadPrivateKey(privateKeyBase64);
         this.publicKey = loadPublicKey(publicKeyBase64);
@@ -76,11 +76,7 @@ public class JwtProvider {
         return token;
     }
 
-    public Duration getAccessValidity() {
-        return accessValidity;
-    }
-
-    public String createRefreshToken(Long userId, List<String> roles) {
+    public String createRefreshToken(Long userId) {
         Instant now = Instant.now();
         String jti = UUID.randomUUID().toString();
         String token = Jwts.builder()
