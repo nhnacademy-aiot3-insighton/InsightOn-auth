@@ -10,7 +10,6 @@ import com.nhnacademy.insightonauth.dto.common.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Pageable;
@@ -27,17 +26,13 @@ public interface AdminApi {
 
     @Operation(summary = "관리자 로그인",
             description = "응답 규약은 일반 로그인과 동일. 비관리자 계정은 이 경로로 로그인할 수 없다.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "로그인 성공 또는 탈퇴 후 복구 대기(PENDING_RESTORE) 안내"),
-            @ApiResponse(responseCode = "401", description = "이메일 또는 비밀번호 불일치(비관리자 계정 포함)")
-    })
+    @ApiResponse(responseCode = "200", description = "로그인 성공 또는 탈퇴 후 복구 대기(PENDING_RESTORE) 안내")
+    @ApiResponse(responseCode = "401", description = "이메일 또는 비밀번호 불일치(비관리자 계정 포함)")
     ResponseEntity<UserLoginResponse> doLogin(UserLoginRequest userLoginRequest);
 
     @Operation(summary = "회원 목록 조회", description = "검색·페이징으로 회원 목록을 조회한다. status가 빈값/생략이면 전체 상태를 조회한다.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "400", description = "알 수 없는 status 값")
-    })
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @ApiResponse(responseCode = "400", description = "알 수 없는 status 값")
     @SecurityRequirement(name = "bearerAuth")
     ResponseEntity<PageResponse<AdminFindUsersResponse>> findUsers(
             @Parameter(description = "이메일 검색어") String email,
