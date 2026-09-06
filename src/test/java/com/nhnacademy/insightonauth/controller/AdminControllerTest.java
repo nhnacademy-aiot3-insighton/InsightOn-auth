@@ -1,5 +1,6 @@
 package com.nhnacademy.insightonauth.controller;
 
+import com.nhnacademy.insightonauth.controller.api.AdminController;
 import com.nhnacademy.insightonauth.controller.support.LoginResponder;
 import com.nhnacademy.insightonauth.dto.admin.AdminFindUsersResponse;
 import com.nhnacademy.insightonauth.dto.admin.AdminUserDetailResponse;

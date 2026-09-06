@@ -1,7 +1,7 @@
-package com.nhnacademy.insightonauth.controller;
+package com.nhnacademy.insightonauth.controller.api;
 
+import com.nhnacademy.insightonauth.controller.swagger.TokenApi;
 import com.nhnacademy.insightonauth.service.TokenBlacklistService;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,14 +19,15 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
-public class TokenController {
+public class TokenController implements TokenApi {
 
     private final TokenBlacklistService tokenBlacklistService;
 
     // 주어진 jti(액세스 토큰 ID)가 블랙리스트에 있는지 여부 반환 — 게이트웨이가 인가 전에 호출
+    @Override
     @GetMapping("/tokens/{jti}/blacklisted")
     public ResponseEntity<Boolean> blacklistedCheck(
-            @PathVariable("jti") @NotBlank String jti) {
+            @PathVariable("jti") String jti) {
         boolean blacklisted = tokenBlacklistService.isBlacklisted(jti);
         return ResponseEntity.ok(blacklisted);
     }

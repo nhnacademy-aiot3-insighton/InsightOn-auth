@@ -1,5 +1,6 @@
 package com.nhnacademy.insightonauth.controller;
 
+import com.nhnacademy.insightonauth.controller.api.TokenController;
 import com.nhnacademy.insightonauth.handler.GlobalExceptionHandler;
 import com.nhnacademy.insightonauth.service.TokenBlacklistService;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
