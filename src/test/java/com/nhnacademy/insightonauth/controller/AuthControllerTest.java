@@ -1,6 +1,7 @@
 package com.nhnacademy.insightonauth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nhnacademy.insightonauth.controller.api.AuthController;
 import com.nhnacademy.insightonauth.controller.support.LoginResponder;
 import com.nhnacademy.insightonauth.controller.support.OauthWebSupport;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;

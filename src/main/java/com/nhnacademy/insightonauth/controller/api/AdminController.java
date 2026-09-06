@@ -1,7 +1,8 @@
-package com.nhnacademy.insightonauth.controller;
+package com.nhnacademy.insightonauth.controller.api;
 
 
 import com.nhnacademy.insightonauth.controller.support.LoginResponder;
+import com.nhnacademy.insightonauth.controller.swagger.AdminApi;
 import com.nhnacademy.insightonauth.dto.admin.AdminFindUsersResponse;
 import com.nhnacademy.insightonauth.dto.admin.AdminUserDetailResponse;
 import com.nhnacademy.insightonauth.dto.admin.RoleResponse;
@@ -28,7 +29,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
-public class AdminController {
+public class AdminController implements AdminApi {
 
     private final AdminUserService adminUserService;
     private final UserAuthenticationService userAuthenticationService;
@@ -36,6 +37,7 @@ public class AdminController {
     private final LoginResponder loginResponder;
 
     // 관리자 로그인 — 응답 규약은 일반 로그인과 동일. 비관리자 계정은 이 경로로 로그인 불가
+    @Override
     @PostMapping("/login")
     public ResponseEntity<UserLoginResponse> doLogin(
             @RequestBody @Valid UserLoginRequest userLoginRequest) {
@@ -57,6 +59,7 @@ public class AdminController {
     }
 
     // 회원 목록 조회 (검색·페이징). status 빈값/생략이면 전체 상태 조회.
+    @Override
     @GetMapping("/users")
     public ResponseEntity<PageResponse<AdminFindUsersResponse>> findUsers(
             @RequestParam(required = false) String email,
@@ -79,6 +82,7 @@ public class AdminController {
     }
 
     // 회원 상세 조회
+    @Override
     @GetMapping("/users/{userId}")
     public ResponseEntity<AdminUserDetailResponse> findUserDetail(@PathVariable Long userId) {
         AdminUserDetailResponse response = adminUserService.findUserDetail(userId);
@@ -86,12 +90,14 @@ public class AdminController {
     }
 
     // 지정 가능한 권한 목록
+    @Override
     @GetMapping("/roles")
     public ResponseEntity<List<RoleResponse>> roles() {
         return ResponseEntity.ok(adminUserService.findAssignableRoles());
     }
 
     // 회원 계정 차단
+    @Override
     @PostMapping("/users/{userId}/block")
     public ResponseEntity<Void> block(@PathVariable Long userId) {
         adminUserService.block(userId);
@@ -99,6 +105,7 @@ public class AdminController {
     }
 
     // 회원 계정 휴면 전환
+    @Override
     @PostMapping("/users/{userId}/sleep")
     public ResponseEntity<Void> sleep(@PathVariable Long userId) {
         adminUserService.sleep(userId);
@@ -106,6 +113,7 @@ public class AdminController {
     }
 
     // 회원 계정 활성화 (복구)
+    @Override
     @PostMapping("/users/{userId}/activate")
     public ResponseEntity<Void> activate(@PathVariable Long userId) {
         adminUserService.activate(userId);
@@ -113,6 +121,7 @@ public class AdminController {
     }
 
     // 회원 권한 변경 — 요청 바디의 목록으로 전체 교체 (유지/추가/삭제 자동 계산)
+    @Override
     @PutMapping("/users/{userId}/roles")
     public ResponseEntity<Void> updateRoles(
             @PathVariable Long userId,
@@ -123,6 +132,7 @@ public class AdminController {
     }
 
     // 강제 로그아웃
+    @Override
     @PostMapping("/users/{userId}/force-logout")
     public ResponseEntity<Void> forceLogout(
             @PathVariable Long userId) {
