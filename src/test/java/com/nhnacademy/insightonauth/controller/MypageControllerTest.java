@@ -1,5 +1,6 @@
 package com.nhnacademy.insightonauth.controller;
 
+import com.nhnacademy.insightonauth.controller.api.MypageController;
 import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
 import com.nhnacademy.insightonauth.dto.mypage.MyRoleResponse;
 import com.nhnacademy.insightonauth.dto.oauth.OauthResponse;

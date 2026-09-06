@@ -1,5 +1,6 @@
-package com.nhnacademy.insightonauth.controller;
+package com.nhnacademy.insightonauth.controller.api;
 
+import com.nhnacademy.insightonauth.controller.swagger.MypageApi;
 import com.nhnacademy.insightonauth.dto.mypage.MyInfoResponse;
 import com.nhnacademy.insightonauth.dto.mypage.PasswordChangeRequest;
 import com.nhnacademy.insightonauth.dto.mypage.MyRoleResponse;
@@ -19,7 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
-public class MypageController {
+public class MypageController implements MypageApi {
 
     private static final String X_USER_ID = "X-User-Id";
 
@@ -28,6 +29,7 @@ public class MypageController {
     private final UserManagementService userManagementService;
 
     // 내 정보 조회
+    @Override
     @GetMapping("/me")
     public ResponseEntity<MyInfoResponse> findMyInfo(
             @RequestHeader(name = X_USER_ID) Long userId) {
@@ -37,6 +39,7 @@ public class MypageController {
     }
 
     // 내 정보 수정
+    @Override
     @PutMapping("/me")
     public ResponseEntity<Void> updateMyInfo(
             @RequestHeader(name = X_USER_ID) Long userId,
@@ -49,6 +52,7 @@ public class MypageController {
     }
 
     // 탈퇴
+    @Override
     @DeleteMapping("/me")
     public ResponseEntity<Void> withdraw(
             @RequestHeader(name = X_USER_ID) Long userId,
@@ -59,6 +63,7 @@ public class MypageController {
     }
 
     // 비밀번호 변경
+    @Override
     @PutMapping("/me/password")
     public ResponseEntity<Void> changePassword(
             @RequestHeader(name = X_USER_ID) Long userId,
@@ -69,6 +74,7 @@ public class MypageController {
     }
 
     // 내 권한 목록 조회
+    @Override
     @GetMapping("/me/roles")
     public ResponseEntity<List<MyRoleResponse>> findMyRoles(
             @RequestHeader(name = X_USER_ID) Long userId) {
@@ -78,6 +84,7 @@ public class MypageController {
     }
 
     // 연동 소셜 계정 목록
+    @Override
     @GetMapping("/me/oauths")
     public ResponseEntity<List<OauthResponse>> findMyOauths(
             @RequestHeader(name = X_USER_ID) Long userId) {
@@ -90,6 +97,7 @@ public class MypageController {
     // (provider 동의 화면 → GET /oauth/callback → AuthController 가 상태에 따라 linkOauth 또는 confirmMerge 호출)
 
     // 소셜 계정 연동 해제
+    @Override
     @DeleteMapping("/me/oauths/{oauthId}")
     public ResponseEntity<Void> unlinkOauth(
             @RequestHeader(name = X_USER_ID) Long userId,
