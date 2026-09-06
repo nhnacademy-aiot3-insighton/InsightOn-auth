@@ -15,7 +15,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
@@ -44,10 +43,8 @@ public interface AuthApi {
 
     @Operation(summary = "일반 회원 로그인",
             description = "access 토큰은 응답 본문, refresh 토큰은 HttpOnly 쿠키로 내려간다. 관리자 계정은 이 경로로 로그인할 수 없다.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "로그인 성공 또는 탈퇴 후 복구 대기(PENDING_RESTORE) 안내"),
-            @ApiResponse(responseCode = "401", description = "이메일 또는 비밀번호 불일치(관리자 계정 포함)", content = @Content)
-    })
+    @ApiResponse(responseCode = "200", description = "로그인 성공 또는 탈퇴 후 복구 대기(PENDING_RESTORE) 안내")
+    @ApiResponse(responseCode = "401", description = "이메일 또는 비밀번호 불일치(관리자 계정 포함)", content = @Content)
     ResponseEntity<UserLoginResponse> doLogin(UserLoginRequest userLoginRequest);
 
     @Operation(summary = "로그아웃", description = "refresh 토큰을 삭제하고 현재 access 토큰을 블랙리스트에 등록한다.")
@@ -94,10 +91,8 @@ public interface AuthApi {
             @Parameter(description = "accessToken 쿠키(연동 콜백일 때 현재 로그인 유저 식별용)") String accessToken);
 
     @Operation(summary = "액세스 토큰 재발급", description = "refreshToken 쿠키로 새 access 토큰을 재발급한다.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "재발급 성공"),
-            @ApiResponse(responseCode = "401", description = "refreshToken 쿠키 없음 또는 서명·만료 검증 실패")
-    })
+    @ApiResponse(responseCode = "200", description = "재발급 성공")
+    @ApiResponse(responseCode = "401", description = "refreshToken 쿠키 없음 또는 서명·만료 검증 실패")
     ResponseEntity<TokenRefreshResponse> refresh(
             @Parameter(description = "refreshToken 쿠키", required = true) String refreshToken);
 }
