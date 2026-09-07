@@ -193,7 +193,9 @@ class AdminUserServiceImplTest {
     @Test
     @DisplayName("updateUserRoles - 자기 자신을 대상으로 지정하면 예외, 조회/변경 전혀 안 함")
     void updateUserRoles_self_throws() {
-        assertThatThrownBy(() -> adminUserService.updateUserRoles(1L, 1L, List.of(Role.MEMBER)))
+        List<Role> roles = List.of(Role.MEMBER);
+
+        assertThatThrownBy(() -> adminUserService.updateUserRoles(1L, 1L, roles))
                 .isInstanceOf(SelfTargetNotAllowedException.class);
 
         verify(userManagementService, never()).findById(any());
