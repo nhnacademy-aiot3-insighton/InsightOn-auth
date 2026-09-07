@@ -8,6 +8,7 @@ import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserRole;
 import com.nhnacademy.insightonauth.exception.user.InvalidUserRoleException;
+import com.nhnacademy.insightonauth.exception.user.SelfTargetNotAllowedException;
 import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.AdminUserService;
 import com.nhnacademy.insightonauth.service.TokenBlacklistService;
@@ -74,12 +75,14 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
-    public void block(Long userId) {
+    public void block(Long adminId, Long userId) {
+        requireNotSelf(adminId, userId, "자기 자신을 차단할 수 없습니다.");
         userManagementService.block(userId);
     }
 
     @Override
-    public void sleep(Long userId) {
+    public void sleep(Long adminId, Long userId) {
+        requireNotSelf(adminId, userId, "자기 자신을 휴면 전환할 수 없습니다.");
         userManagementService.sleep(userId);
     }
 
@@ -94,7 +97,9 @@ public class AdminUserServiceImpl implements AdminUserService {
      * 권한 셋이 바뀌면 현재 access 토큰을 무효화해 재로그인 시 새 권한이 반영되게 한다.
      */
     @Override
-    public void updateUserRoles(Long userId, List<Role> roleList) {
+    public void updateUserRoles(Long adminId, Long userId, List<Role> roleList) {
+        requireNotSelf(adminId, userId, "자기 자신의 권한을 변경할 수 없습니다.");
+
         if (roleList == null || roleList.isEmpty()) {
             throw new InvalidUserRoleException("권한은 최소 1개 이상이어야 합니다.");
         }
@@ -135,8 +140,15 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
-    public void forceLogout(Long userId) {
+    public void forceLogout(Long adminId, Long userId) {
+        requireNotSelf(adminId, userId, "자기 자신을 강제 로그아웃할 수 없습니다.");
         userAuthenticationService.forceLogout(userId);
+    }
+
+    private void requireNotSelf(Long adminId, Long userId, String message) {
+        if (adminId.equals(userId)) {
+            throw new SelfTargetNotAllowedException(message);
+        }
     }
 
 }
