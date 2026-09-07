@@ -7,6 +7,7 @@ import com.nhnacademy.insightonauth.entity.Status;
 import com.nhnacademy.insightonauth.entity.User;
 import com.nhnacademy.insightonauth.entity.UserRole;
 import com.nhnacademy.insightonauth.exception.user.InvalidUserRoleException;
+import com.nhnacademy.insightonauth.exception.user.SelfTargetNotAllowedException;
 import com.nhnacademy.insightonauth.repository.UserRepository;
 import com.nhnacademy.insightonauth.service.TokenBlacklistService;
 import com.nhnacademy.insightonauth.service.UserAuthenticationService;
@@ -105,8 +106,8 @@ class AdminUserServiceImplTest {
     @Test
     @DisplayName("block/sleep/activate는 UserManagementService에 위임")
     void statusChanges_delegate() {
-        adminUserService.block(1L);
-        adminUserService.sleep(1L);
+        adminUserService.block(99L, 1L);
+        adminUserService.sleep(99L, 1L);
         adminUserService.activate(1L);
 
         verify(userManagementService).block(1L);
@@ -115,12 +116,30 @@ class AdminUserServiceImplTest {
     }
 
     @Test
+    @DisplayName("block - 자기 자신을 대상으로 지정하면 예외, UserManagementService 호출 안 함")
+    void block_self_throws() {
+        assertThatThrownBy(() -> adminUserService.block(1L, 1L))
+                .isInstanceOf(SelfTargetNotAllowedException.class);
+
+        verify(userManagementService, never()).block(any());
+    }
+
+    @Test
+    @DisplayName("sleep - 자기 자신을 대상으로 지정하면 예외, UserManagementService 호출 안 함")
+    void sleep_self_throws() {
+        assertThatThrownBy(() -> adminUserService.sleep(1L, 1L))
+                .isInstanceOf(SelfTargetNotAllowedException.class);
+
+        verify(userManagementService, never()).sleep(any());
+    }
+
+    @Test
     @DisplayName("updateUserRoles - MEMBER 를 ADMIN 으로 승격 (MEMBER 제거 + ADMIN 추가)")
     void updateUserRoles_promote() {
         when(userManagementService.findById(1L)).thenReturn(user);
         when(userRoleService.findByUser(user)).thenReturn(List.of(new UserRole(user, Role.MEMBER)));
 
-        adminUserService.updateUserRoles(1L, List.of(Role.ADMIN));
+        adminUserService.updateUserRoles(99L, 1L, List.of(Role.ADMIN));
 
         verify(userRoleService).addRole(user, Role.ADMIN);
         verify(userRoleService).removeRole(user, Role.MEMBER);
@@ -133,7 +152,7 @@ class AdminUserServiceImplTest {
         when(userManagementService.findById(1L)).thenReturn(user);
         when(userRoleService.findByUser(user)).thenReturn(List.of(new UserRole(user, Role.ADMIN)));
 
-        adminUserService.updateUserRoles(1L, List.of(Role.MEMBER));
+        adminUserService.updateUserRoles(99L, 1L, List.of(Role.MEMBER));
 
         verify(userRoleService).addRole(user, Role.MEMBER);
         verify(userRoleService).removeRole(user, Role.ADMIN);
@@ -146,7 +165,7 @@ class AdminUserServiceImplTest {
         when(userManagementService.findById(1L)).thenReturn(user);
         when(userRoleService.findByUser(user)).thenReturn(List.of(new UserRole(user, Role.MEMBER)));
 
-        adminUserService.updateUserRoles(1L, List.of(Role.MEMBER));
+        adminUserService.updateUserRoles(99L, 1L, List.of(Role.MEMBER));
 
         verify(userRoleService, never()).addRole(eq(user), any());
         verify(userRoleService, never()).removeRole(eq(user), any());
@@ -158,7 +177,7 @@ class AdminUserServiceImplTest {
     void updateUserRoles_empty() {
         List<Role> emptyRoles = List.of();
 
-        assertThatThrownBy(() -> adminUserService.updateUserRoles(1L, emptyRoles))
+        assertThatThrownBy(() -> adminUserService.updateUserRoles(99L, 1L, emptyRoles))
                 .isInstanceOf(InvalidUserRoleException.class);
     }
 
@@ -167,16 +186,34 @@ class AdminUserServiceImplTest {
     void updateUserRoles_adminNotCombinable() {
         List<Role> combinedRoles = List.of(Role.MEMBER, Role.ADMIN);
 
-        assertThatThrownBy(() -> adminUserService.updateUserRoles(1L, combinedRoles))
+        assertThatThrownBy(() -> adminUserService.updateUserRoles(99L, 1L, combinedRoles))
                 .isInstanceOf(InvalidUserRoleException.class);
+    }
+
+    @Test
+    @DisplayName("updateUserRoles - 자기 자신을 대상으로 지정하면 예외, 조회/변경 전혀 안 함")
+    void updateUserRoles_self_throws() {
+        assertThatThrownBy(() -> adminUserService.updateUserRoles(1L, 1L, List.of(Role.MEMBER)))
+                .isInstanceOf(SelfTargetNotAllowedException.class);
+
+        verify(userManagementService, never()).findById(any());
     }
 
     @Test
     @DisplayName("강제 로그아웃은 UserAuthenticationService에 위임")
     void forceLogout_delegates() {
-        adminUserService.forceLogout(1L);
+        adminUserService.forceLogout(99L, 1L);
 
         verify(userAuthenticationService).forceLogout(1L);
+    }
+
+    @Test
+    @DisplayName("forceLogout - 자기 자신을 대상으로 지정하면 예외, UserAuthenticationService 호출 안 함")
+    void forceLogout_self_throws() {
+        assertThatThrownBy(() -> adminUserService.forceLogout(1L, 1L))
+                .isInstanceOf(SelfTargetNotAllowedException.class);
+
+        verify(userAuthenticationService, never()).forceLogout(any());
     }
 
     @Test

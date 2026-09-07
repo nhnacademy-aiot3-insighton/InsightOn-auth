@@ -7,6 +7,7 @@ import com.nhnacademy.insightonauth.dto.admin.AdminUserDetailResponse;
 import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
 import com.nhnacademy.insightonauth.entity.Role;
 import com.nhnacademy.insightonauth.entity.Status;
+import com.nhnacademy.insightonauth.exception.user.SelfTargetNotAllowedException;
 import com.nhnacademy.insightonauth.handler.GlobalExceptionHandler;
 import com.nhnacademy.insightonauth.provider.JwtProvider;
 import com.nhnacademy.insightonauth.service.AdminUserService;
@@ -32,7 +33,9 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -171,17 +174,17 @@ class AdminControllerTest {
     @Test
     @DisplayName("POST /users/{userId}/block — 204")
     void block() throws Exception {
-        mvc.perform(post("/api/v1/admin/users/1/block"))
+        mvc.perform(post("/api/v1/admin/users/1/block").header("X-User-Id", "99"))
                 .andExpect(status().isNoContent());
-        verify(adminUserService).block(1L);
+        verify(adminUserService).block(99L, 1L);
     }
 
     @Test
     @DisplayName("POST /users/{userId}/sleep — 204")
     void sleep() throws Exception {
-        mvc.perform(post("/api/v1/admin/users/1/sleep"))
+        mvc.perform(post("/api/v1/admin/users/1/sleep").header("X-User-Id", "99"))
                 .andExpect(status().isNoContent());
-        verify(adminUserService).sleep(1L);
+        verify(adminUserService).sleep(99L, 1L);
     }
 
     @Test
@@ -196,18 +199,20 @@ class AdminControllerTest {
     @DisplayName("PUT /users/{userId}/roles — 204 (권한 전체 교체)")
     void updateRoles() throws Exception {
         mvc.perform(put("/api/v1/admin/users/1/roles")
+                        .header("X-User-Id", "99")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 { "roles": ["MEMBER"] }
                                 """))
                 .andExpect(status().isNoContent());
-        verify(adminUserService).updateUserRoles(1L, List.of(Role.MEMBER));
+        verify(adminUserService).updateUserRoles(99L, 1L, List.of(Role.MEMBER));
     }
 
     @Test
     @DisplayName("PUT /users/{userId}/roles — roles 비어있으면 400")
     void updateRoles_validation() throws Exception {
         mvc.perform(put("/api/v1/admin/users/1/roles")
+                        .header("X-User-Id", "99")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 { "roles": [] }
@@ -219,6 +224,7 @@ class AdminControllerTest {
     @DisplayName("PUT /users/{userId}/roles — roles 항목에 null 이 있으면 400")
     void updateRoles_nullElement() throws Exception {
         mvc.perform(put("/api/v1/admin/users/1/roles")
+                        .header("X-User-Id", "99")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 { "roles": [null] }
@@ -227,10 +233,35 @@ class AdminControllerTest {
     }
 
     @Test
+    @DisplayName("PUT /users/{userId}/roles — 자기 자신 대상이면 403")
+    void updateRoles_self() throws Exception {
+        doThrow(new SelfTargetNotAllowedException("자기 자신의 권한을 변경할 수 없습니다."))
+                .when(adminUserService).updateUserRoles(eq(1L), eq(1L), any());
+
+        mvc.perform(put("/api/v1/admin/users/1/roles")
+                        .header("X-User-Id", "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "roles": ["MEMBER"] }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @DisplayName("POST /users/{userId}/force-logout — 204")
     void forceLogout() throws Exception {
-        mvc.perform(post("/api/v1/admin/users/1/force-logout"))
+        mvc.perform(post("/api/v1/admin/users/1/force-logout").header("X-User-Id", "99"))
                 .andExpect(status().isNoContent());
-        verify(adminUserService).forceLogout(1L);
+        verify(adminUserService).forceLogout(99L, 1L);
+    }
+
+    @Test
+    @DisplayName("POST /users/{userId}/block — 자기 자신 대상이면 403")
+    void block_self() throws Exception {
+        doThrow(new SelfTargetNotAllowedException("자기 자신을 차단할 수 없습니다."))
+                .when(adminUserService).block(1L, 1L);
+
+        mvc.perform(post("/api/v1/admin/users/1/block").header("X-User-Id", "1"))
+                .andExpect(status().isForbidden());
     }
 }

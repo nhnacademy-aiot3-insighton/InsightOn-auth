@@ -17,15 +17,15 @@ public interface AdminUserService {
 
     AdminUserDetailResponse findUserDetail(Long userId);
 
-    void block(Long userId);
+    void block(Long adminId, Long userId);
 
-    void sleep(Long userId);
+    void sleep(Long adminId, Long userId);
 
     void activate(Long userId);
 
-    void updateUserRoles(Long userId, List<Role> roleList);
+    void updateUserRoles(Long adminId, Long userId, List<Role> roleList);
 
     List<RoleResponse> findAssignableRoles();
 
-    void forceLogout(Long userId);
+    void forceLogout(Long adminId, Long userId);
 }

@@ -53,13 +53,19 @@ public interface AdminApi {
 
     @Operation(summary = "회원 계정 차단")
     @ApiResponse(responseCode = "204", description = "차단 성공")
+    @ApiResponse(responseCode = "403", description = "자기 자신을 대상으로 지정함")
     @SecurityRequirement(name = "bearerAuth")
-    ResponseEntity<Void> block(@Parameter(description = "회원 ID", required = true) Long userId);
+    ResponseEntity<Void> block(
+            @Parameter(description = "요청자 관리자 ID (게이트웨이 주입)", required = true) Long adminId,
+            @Parameter(description = "회원 ID", required = true) Long userId);
 
     @Operation(summary = "회원 계정 휴면 전환")
     @ApiResponse(responseCode = "204", description = "전환 성공")
+    @ApiResponse(responseCode = "403", description = "자기 자신을 대상으로 지정함")
     @SecurityRequirement(name = "bearerAuth")
-    ResponseEntity<Void> sleep(@Parameter(description = "회원 ID", required = true) Long userId);
+    ResponseEntity<Void> sleep(
+            @Parameter(description = "요청자 관리자 ID (게이트웨이 주입)", required = true) Long adminId,
+            @Parameter(description = "회원 ID", required = true) Long userId);
 
     @Operation(summary = "회원 계정 활성화(복구)")
     @ApiResponse(responseCode = "204", description = "활성화 성공")
@@ -68,13 +74,18 @@ public interface AdminApi {
 
     @Operation(summary = "회원 권한 변경", description = "요청 바디의 목록으로 권한을 전체 교체한다(유지/추가/삭제 자동 계산).")
     @ApiResponse(responseCode = "204", description = "변경 성공")
+    @ApiResponse(responseCode = "403", description = "자기 자신을 대상으로 지정함")
     @SecurityRequirement(name = "bearerAuth")
     ResponseEntity<Void> updateRoles(
+            @Parameter(description = "요청자 관리자 ID (게이트웨이 주입)", required = true) Long adminId,
             @Parameter(description = "회원 ID", required = true) Long userId,
             RolesUpdateRequest request);
 
     @Operation(summary = "회원 강제 로그아웃")
     @ApiResponse(responseCode = "204", description = "강제 로그아웃 성공")
+    @ApiResponse(responseCode = "403", description = "자기 자신을 대상으로 지정함")
     @SecurityRequirement(name = "bearerAuth")
-    ResponseEntity<Void> forceLogout(@Parameter(description = "회원 ID", required = true) Long userId);
+    ResponseEntity<Void> forceLogout(
+            @Parameter(description = "요청자 관리자 ID (게이트웨이 주입)", required = true) Long adminId,
+            @Parameter(description = "회원 ID", required = true) Long userId);
 }

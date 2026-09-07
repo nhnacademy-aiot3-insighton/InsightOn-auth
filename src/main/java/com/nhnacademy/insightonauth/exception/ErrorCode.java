@@ -49,7 +49,9 @@ public enum ErrorCode {
 
     INVALID_EMAIL_FORMAT(HttpStatus.BAD_REQUEST),
 
-    OAUTH_PROVIDER_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY);
+    OAUTH_PROVIDER_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY),
+
+    SELF_TARGET_NOT_ALLOWED(HttpStatus.FORBIDDEN);
 
     private final HttpStatus status;
 

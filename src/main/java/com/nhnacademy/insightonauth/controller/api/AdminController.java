@@ -31,6 +31,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminController implements AdminApi {
 
+    private static final String X_USER_ID = "X-User-Id";
+
     private final AdminUserService adminUserService;
     private final UserAuthenticationService userAuthenticationService;
     private final JwtProvider jwtProvider;
@@ -99,16 +101,20 @@ public class AdminController implements AdminApi {
     // 회원 계정 차단
     @Override
     @PostMapping("/users/{userId}/block")
-    public ResponseEntity<Void> block(@PathVariable Long userId) {
-        adminUserService.block(userId);
+    public ResponseEntity<Void> block(
+            @RequestHeader(name = X_USER_ID) Long adminId,
+            @PathVariable Long userId) {
+        adminUserService.block(adminId, userId);
         return ResponseEntity.noContent().build();
     }
 
     // 회원 계정 휴면 전환
     @Override
     @PostMapping("/users/{userId}/sleep")
-    public ResponseEntity<Void> sleep(@PathVariable Long userId) {
-        adminUserService.sleep(userId);
+    public ResponseEntity<Void> sleep(
+            @RequestHeader(name = X_USER_ID) Long adminId,
+            @PathVariable Long userId) {
+        adminUserService.sleep(adminId, userId);
         return ResponseEntity.noContent().build();
     }
 
@@ -124,10 +130,11 @@ public class AdminController implements AdminApi {
     @Override
     @PutMapping("/users/{userId}/roles")
     public ResponseEntity<Void> updateRoles(
+            @RequestHeader(name = X_USER_ID) Long adminId,
             @PathVariable Long userId,
             @RequestBody @Valid RolesUpdateRequest request) {
 
-        adminUserService.updateUserRoles(userId, request.roles());
+        adminUserService.updateUserRoles(adminId, userId, request.roles());
         return ResponseEntity.noContent().build();
     }
 
@@ -135,8 +142,9 @@ public class AdminController implements AdminApi {
     @Override
     @PostMapping("/users/{userId}/force-logout")
     public ResponseEntity<Void> forceLogout(
+            @RequestHeader(name = X_USER_ID) Long adminId,
             @PathVariable Long userId) {
-        adminUserService.forceLogout(userId);
+        adminUserService.forceLogout(adminId, userId);
         return ResponseEntity.noContent().build();
     }
 }
