@@ -9,6 +9,7 @@ import com.nhnacademy.insightonauth.dto.auth.UserLoginResponse;
 import com.nhnacademy.insightonauth.dto.common.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -56,7 +57,8 @@ public interface AdminApi {
     @ApiResponse(responseCode = "403", description = "자기 자신을 대상으로 지정함")
     @SecurityRequirement(name = "bearerAuth")
     ResponseEntity<Void> block(
-            @Parameter(description = "요청자 관리자 ID (게이트웨이 주입)", required = true) Long adminId,
+            @Parameter(name = "X-User-Id", in = ParameterIn.HEADER,
+                    description = "요청자 관리자 ID (게이트웨이 주입)", required = true) Long adminId,
             @Parameter(description = "회원 ID", required = true) Long userId);
 
     @Operation(summary = "회원 계정 휴면 전환")
@@ -64,7 +66,8 @@ public interface AdminApi {
     @ApiResponse(responseCode = "403", description = "자기 자신을 대상으로 지정함")
     @SecurityRequirement(name = "bearerAuth")
     ResponseEntity<Void> sleep(
-            @Parameter(description = "요청자 관리자 ID (게이트웨이 주입)", required = true) Long adminId,
+            @Parameter(name = "X-User-Id", in = ParameterIn.HEADER,
+                    description = "요청자 관리자 ID (게이트웨이 주입)", required = true) Long adminId,
             @Parameter(description = "회원 ID", required = true) Long userId);
 
     @Operation(summary = "회원 계정 활성화(복구)")
@@ -77,7 +80,8 @@ public interface AdminApi {
     @ApiResponse(responseCode = "403", description = "자기 자신을 대상으로 지정함")
     @SecurityRequirement(name = "bearerAuth")
     ResponseEntity<Void> updateRoles(
-            @Parameter(description = "요청자 관리자 ID (게이트웨이 주입)", required = true) Long adminId,
+            @Parameter(name = "X-User-Id", in = ParameterIn.HEADER,
+                    description = "요청자 관리자 ID (게이트웨이 주입)", required = true) Long adminId,
             @Parameter(description = "회원 ID", required = true) Long userId,
             RolesUpdateRequest request);
 
@@ -86,6 +90,7 @@ public interface AdminApi {
     @ApiResponse(responseCode = "403", description = "자기 자신을 대상으로 지정함")
     @SecurityRequirement(name = "bearerAuth")
     ResponseEntity<Void> forceLogout(
-            @Parameter(description = "요청자 관리자 ID (게이트웨이 주입)", required = true) Long adminId,
+            @Parameter(name = "X-User-Id", in = ParameterIn.HEADER,
+                    description = "요청자 관리자 ID (게이트웨이 주입)", required = true) Long adminId,
             @Parameter(description = "회원 ID", required = true) Long userId);
 }
