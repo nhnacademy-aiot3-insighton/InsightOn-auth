@@ -48,8 +48,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/api/v1/admin/login",
-                                "http://insighton-zipkin:9411/api/v2/spans").permitAll()
+                                "/api/v1/admin/login").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/users/me/**").authenticated()
                         .anyRequest().authenticated())
