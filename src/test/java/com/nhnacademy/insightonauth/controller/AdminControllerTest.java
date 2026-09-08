@@ -1,0 +1,267 @@
+package com.nhnacademy.insightonauth.controller;
+
+import com.nhnacademy.insightonauth.controller.api.AdminController;
+import com.nhnacademy.insightonauth.controller.support.LoginResponder;
+import com.nhnacademy.insightonauth.dto.admin.AdminFindUsersResponse;
+import com.nhnacademy.insightonauth.dto.admin.AdminUserDetailResponse;
+import com.nhnacademy.insightonauth.dto.auth.UserLoginResult;
+import com.nhnacademy.insightonauth.entity.Role;
+import com.nhnacademy.insightonauth.entity.Status;
+import com.nhnacademy.insightonauth.exception.user.SelfTargetNotAllowedException;
+import com.nhnacademy.insightonauth.handler.GlobalExceptionHandler;
+import com.nhnacademy.insightonauth.provider.JwtProvider;
+import com.nhnacademy.insightonauth.service.AdminUserService;
+import com.nhnacademy.insightonauth.service.UserAuthenticationService;
+import com.nhnacademy.insightonauth.service.UserManagementService;
+import com.nhnacademy.insightonauth.service.UserRoleService;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * AdminController HTTP 계약 고정 테스트.
+ */
+@WebMvcTest(controllers = AdminController.class,
+        excludeAutoConfiguration = {SecurityAutoConfiguration.class, SecurityFilterAutoConfiguration.class})
+@Import({GlobalExceptionHandler.class, LoginResponder.class})
+class AdminControllerTest {
+
+    @Autowired MockMvc mvc;
+
+    @MockitoBean AdminUserService adminUserService;
+    @MockitoBean UserAuthenticationService userAuthenticationService;
+    @MockitoBean UserManagementService userManagementService;
+    @MockitoBean JwtProvider jwtProvider;
+    @MockitoBean UserRoleService userRoleService; // HeaderAuthenticationFilter 의존성
+
+    @Test
+    @DisplayName("POST /login — 관리자면 200, refreshToken 쿠키")
+    void adminLogin() throws Exception {
+        when(userAuthenticationService.login("admin@test.com", "Abcd1234!"))
+                .thenReturn(UserLoginResult.success("admin-acc", "admin-ref"));
+        when(jwtProvider.hasAdminRole("admin-acc")).thenReturn(true);
+
+        mvc.perform(post("/api/v1/admin/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "admin@test.com", "password": "Abcd1234!" }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(cookie().value("refreshToken", "admin-ref"));
+    }
+
+    @Test
+    @DisplayName("POST /login — 탈퇴 복구 가능 관리자 계정은 200 PENDING_RESTORE (500 아님)")
+    void adminLogin_pendingRestore() throws Exception {
+        when(userAuthenticationService.login("admin@test.com", "Abcd1234!"))
+                .thenReturn(UserLoginResult.pendingRestore());
+
+        mvc.perform(post("/api/v1/admin/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "admin@test.com", "password": "Abcd1234!" }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_RESTORE"))
+                .andExpect(jsonPath("$.restoreToken").doesNotExist())
+                .andExpect(jsonPath("$.accessToken").isEmpty())
+                .andExpect(header().doesNotExist("Set-Cookie"));
+
+        verifyNoInteractions(jwtProvider);
+    }
+
+    @Test
+    @DisplayName("POST /login — 일반 회원은 관리자 로그인 불가 401")
+    void adminLogin_nonAdminRejected() throws Exception {
+        when(userAuthenticationService.login(any(), any()))
+                .thenReturn(UserLoginResult.success("member-acc", "r"));
+        when(jwtProvider.hasAdminRole("member-acc")).thenReturn(false);
+
+        mvc.perform(post("/api/v1/admin/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "member@test.com", "password": "Abcd1234!" }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("GET /users — 200, 페이지 결과")
+    void findUsers() throws Exception {
+        Page<AdminFindUsersResponse> page = new PageImpl<>(List.of(
+                new AdminFindUsersResponse(1L, "a@test.com", "유저A", Status.ACTIVE,
+                        OffsetDateTime.now(ZoneOffset.UTC))));
+        when(adminUserService.findUsers(any(), any(), any(), any(Pageable.class))).thenReturn(page);
+
+        mvc.perform(get("/api/v1/admin/users"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].email").value("a@test.com"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.number").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /users?status= — 빈 status 는 전체 조회 (200)")
+    void findUsers_blankStatus() throws Exception {
+        when(adminUserService.findUsers(any(), any(), isNull(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        mvc.perform(get("/api/v1/admin/users").param("status", ""))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("GET /users?status=UNKNOWN — 알 수 없는 상태값은 400")
+    void findUsers_invalidStatus() throws Exception {
+        mvc.perform(get("/api/v1/admin/users").param("status", "UNKNOWN"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /users/{userId} — 200, 상세")
+    void findUserDetail() throws Exception {
+        when(adminUserService.findUserDetail(1L)).thenReturn(
+                new AdminUserDetailResponse(1L, "a@test.com", "유저A", Status.ACTIVE, List.of(Role.MEMBER)));
+
+        mvc.perform(get("/api/v1/admin/users/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userName").value("유저A"))
+                .andExpect(jsonPath("$.roles[0]").value("MEMBER"));
+    }
+
+    @Test
+    @DisplayName("GET /roles — 200, 지정 가능한 권한 목록")
+    void roles() throws Exception {
+        when(adminUserService.findAssignableRoles()).thenReturn(List.of(
+                com.nhnacademy.insightonauth.dto.admin.RoleResponse.from(Role.ADMIN),
+                com.nhnacademy.insightonauth.dto.admin.RoleResponse.from(Role.MEMBER)));
+
+        mvc.perform(get("/api/v1/admin/roles"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("ADMIN"))
+                .andExpect(jsonPath("$[1].name").value("MEMBER"));
+    }
+
+    @Test
+    @DisplayName("POST /users/{userId}/block — 204")
+    void block() throws Exception {
+        mvc.perform(post("/api/v1/admin/users/1/block").header("X-User-Id", "99"))
+                .andExpect(status().isNoContent());
+        verify(adminUserService).block(99L, 1L);
+    }
+
+    @Test
+    @DisplayName("POST /users/{userId}/sleep — 204")
+    void sleep() throws Exception {
+        mvc.perform(post("/api/v1/admin/users/1/sleep").header("X-User-Id", "99"))
+                .andExpect(status().isNoContent());
+        verify(adminUserService).sleep(99L, 1L);
+    }
+
+    @Test
+    @DisplayName("POST /users/{userId}/activate — 204")
+    void activate() throws Exception {
+        mvc.perform(post("/api/v1/admin/users/1/activate"))
+                .andExpect(status().isNoContent());
+        verify(adminUserService).activate(1L);
+    }
+
+    @Test
+    @DisplayName("PUT /users/{userId}/roles — 204 (권한 전체 교체)")
+    void updateRoles() throws Exception {
+        mvc.perform(put("/api/v1/admin/users/1/roles")
+                        .header("X-User-Id", "99")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "roles": ["MEMBER"] }
+                                """))
+                .andExpect(status().isNoContent());
+        verify(adminUserService).updateUserRoles(99L, 1L, List.of(Role.MEMBER));
+    }
+
+    @Test
+    @DisplayName("PUT /users/{userId}/roles — roles 비어있으면 400")
+    void updateRoles_validation() throws Exception {
+        mvc.perform(put("/api/v1/admin/users/1/roles")
+                        .header("X-User-Id", "99")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "roles": [] }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT /users/{userId}/roles — roles 항목에 null 이 있으면 400")
+    void updateRoles_nullElement() throws Exception {
+        mvc.perform(put("/api/v1/admin/users/1/roles")
+                        .header("X-User-Id", "99")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "roles": [null] }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT /users/{userId}/roles — 자기 자신 대상이면 403")
+    void updateRoles_self() throws Exception {
+        doThrow(new SelfTargetNotAllowedException("자기 자신의 권한을 변경할 수 없습니다."))
+                .when(adminUserService).updateUserRoles(eq(1L), eq(1L), any());
+
+        mvc.perform(put("/api/v1/admin/users/1/roles")
+                        .header("X-User-Id", "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "roles": ["MEMBER"] }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("POST /users/{userId}/force-logout — 204")
+    void forceLogout() throws Exception {
+        mvc.perform(post("/api/v1/admin/users/1/force-logout").header("X-User-Id", "99"))
+                .andExpect(status().isNoContent());
+        verify(adminUserService).forceLogout(99L, 1L);
+    }
+
+    @Test
+    @DisplayName("POST /users/{userId}/block — 자기 자신 대상이면 403")
+    void block_self() throws Exception {
+        doThrow(new SelfTargetNotAllowedException("자기 자신을 차단할 수 없습니다."))
+                .when(adminUserService).block(1L, 1L);
+
+        mvc.perform(post("/api/v1/admin/users/1/block").header("X-User-Id", "1"))
+                .andExpect(status().isForbidden());
+    }
+}

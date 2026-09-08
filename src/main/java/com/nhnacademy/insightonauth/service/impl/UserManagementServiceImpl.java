@@ -1,0 +1,294 @@
+package com.nhnacademy.insightonauth.service.impl;
+
+import com.nhnacademy.insightonauth.dto.auth.UserSignupResponse;
+import com.nhnacademy.insightonauth.entity.Role;
+import com.nhnacademy.insightonauth.entity.Status;
+import com.nhnacademy.insightonauth.entity.User;
+import com.nhnacademy.insightonauth.exception.*;
+import com.nhnacademy.insightonauth.exception.auth.*;
+import com.nhnacademy.insightonauth.exception.user.*;
+import com.nhnacademy.insightonauth.exception.email.*;
+import com.nhnacademy.insightonauth.exception.signup.*;
+import com.nhnacademy.insightonauth.exception.oauth.*;
+import com.nhnacademy.insightonauth.exception.external.*;
+import com.nhnacademy.insightonauth.redis.RedisKey;
+import com.nhnacademy.insightonauth.redis.RedisService;
+import com.nhnacademy.insightonauth.repository.UserRepository;
+import com.nhnacademy.insightonauth.service.*;
+import com.nhnacademy.insightonauth.util.PhoneNumberUtil;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
+
+@Slf4j
+@Service
+@Transactional
+@RequiredArgsConstructor
+public class UserManagementServiceImpl implements UserManagementService {
+
+    private static final String USER_NOT_FOUND_MESSAGE = "유저를 찾을 수 없습니다.";
+
+    private final UserRepository userRepository;
+    private final UserCredentialService userCredentialService;
+    private final UserRoleService userRoleService;
+    private final OauthService oauthService;
+    private final EmailVerificationService emailVerificationService;
+    private final RedisService redisService;
+    private final TokenBlacklistService tokenBlacklistService;
+    private final TokenService tokenService;
+    private final CoreService coreService;
+
+    @Override
+    public UserSignupResponse createUser(String email, String password, String userName, String phoneNumber, Role role, String verificationToken) {
+        if (userRepository.existsByEmail(email)) {
+            throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
+        }
+        emailVerificationService.emailVerifyCheck(email, verificationToken);
+
+        String normalized = PhoneNumberUtil.normalize(phoneNumber);
+        if (normalized != null && userRepository.existsByPhoneNumber(normalized)) {
+            throw new DuplicatePhoneNumberException("이미 사용 중인 전화번호입니다.");
+        }
+
+        User user = new User(email, userName, normalized);
+        userRepository.save(user);
+        userCredentialService.create(user, password);
+        userRoleService.create(user, role);
+
+        return new UserSignupResponse(user.getEmail(), user.getUserName(), user.getPhoneNumber(), user.getCreatedAt());
+    }
+
+    @Override
+    public boolean checkEmailAvailable(String email) {
+        return !userRepository.existsByEmail(email);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public User findById(Long userId) {
+        return getUserOrThrow(userId);
+    }
+
+    // findById()는 외부 공개용 트랜잭션 경계라, 이미 같은 클래스의 쓰기 트랜잭션 안에서 실행 중인
+    // 내부 호출들은 self-invocation(프록시 우회)을 피하려고 이 순수 조회 로직을 직접 쓴다.
+    private User getUserOrThrow(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND_MESSAGE));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public User findByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND_MESSAGE));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<User> findReactivatableByEmail(String email) {
+        Optional<User> active = userRepository.findByEmail(email);
+        if (active.isPresent()) {
+            return active;
+        }
+        return userRepository
+                .findByEmailStartingWithAndStatusOrderByWithdrawnAtDesc(email + ";", Status.WITHDRAW)
+                .stream()
+                .findFirst();
+    }
+
+    @Override
+    public void reactivate(User user) {
+        if (user.getStatus() == Status.WITHDRAW) {
+            // 탈퇴 복구는 탈퇴 후 7일 이내만 가능 (휴면은 기간 제한 없음)
+            if (!tokenService.isWithinRestorePeriod(user)) {
+                throw new RestorePeriodExpiredException("탈퇴 복구 가능 기간(7일)이 지났습니다.");
+            }
+
+            String originalEmail = user.reactivatedEmail();
+            if (userRepository.existsByEmail(originalEmail)) {
+                throw new ReactivationConflictException("해당 이메일로 새 계정이 생성되어 복구할 수 없습니다.");
+            }
+
+            String originalPhone = user.reactivatedPhoneNumber();
+            if (originalPhone != null && userRepository.existsByPhoneNumber(originalPhone)) {
+                throw new ReactivationConflictException("해당 전화번호로 새 계정이 생성되어 복구할 수 없습니다.");
+            }
+
+            oauthService.reactivateByUser(user);
+        }
+
+        user.reactivate();
+    }
+
+    @Override
+    public void activate(Long userId) {
+        User user = getUserOrThrow(userId);
+
+        if (user.getStatus() == Status.WITHDRAW) {
+            throw new InvalidUserStatusException("이미 탈퇴한 계정입니다.");
+        }
+
+        user.setStatus(Status.ACTIVE);
+        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+    }
+
+    //탈톼시 비밀번호 확인
+    @Override
+    public void withdraw(Long userId, String accessToken) {
+        User user = getUserOrThrow(userId);
+
+        if (user.getStatus() == Status.WITHDRAW) {
+            throw new InvalidUserStatusException("이미 탈퇴한 계정입니다.");
+        }
+
+        boolean isGroupManager;
+        try {
+            isGroupManager = coreService.isGroupManager(userId);
+        } catch (Exception e) {
+            log.warn("Core 서비스 호출 실패로 탈퇴를 차단합니다 - userId: {}, 원인: {}", userId, e.getMessage());
+            throw new CoreServiceUnavailableException(
+                    "일시적으로 그룹 정보를 확인할 수 없어 탈퇴가 제한됩니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        if (isGroupManager) {
+            throw new ManagerGroupExistsException("그룹 관리자 역할이 있어 탈퇴할 수 없습니다.");
+        }
+
+        user.withdraw();
+        oauthService.maskByUser(user);
+        redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
+        tokenBlacklistService.blacklistToken(accessToken);
+    }
+
+    // block 계정도 sleep으로 해도되나
+    @Override
+    public void sleep(Long userId) {
+        User user = getUserOrThrow(userId);
+
+        if (user.getStatus() == Status.SLEEP) {
+            throw new InvalidUserStatusException("이미 휴면 상태 계정입니다.");
+        }
+        if (user.getStatus() == Status.BLOCK || user.getStatus() == Status.WITHDRAW) {
+            throw new InvalidUserStatusException("차단되었거나 탈퇴한 계정은 휴면 전환할 수 없습니다.");
+        }
+
+        user.setStatus(Status.SLEEP);
+        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+
+        // 현재 access 토큰 무효화 + 리프레시 삭제 — 재발급 차단
+        tokenBlacklistService.blacklistByUserId(userId);
+        redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
+    }
+
+    @Override
+    public void block(Long userId) {
+        User user = getUserOrThrow(userId);
+
+        if (user.getStatus() == Status.BLOCK) {
+            throw new InvalidUserStatusException("이미 정지된 계정입니다.");
+        }
+
+        if (user.getStatus() == Status.WITHDRAW) {
+            throw new InvalidUserStatusException("탈퇴한 계정은 정지할 수 없습니다.");
+        }
+
+        user.setStatus(Status.BLOCK);
+        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+
+        // 현재 access 토큰 무효화 + 리프레시 삭제 — 재발급 차단
+        tokenBlacklistService.blacklistByUserId(userId);
+        redisService.delete(RedisKey.REFRESH.getPrefix() + userId);
+    }
+
+    @Override
+    public void deleteUser(Long userId) {
+        User user = getUserOrThrow(userId);
+
+        // Role 삭제
+        userRoleService.deleteUserRole(user);
+        // 비밀번호 삭제
+        userCredentialService.delete(user);
+        // oauth 삭제
+        oauthService.deleteAllByUser(user);
+        // 유저 삭제
+        userRepository.delete(user);
+    }
+
+    @Override
+    public void updateUserName(Long userId, String newUserName) {
+        User user = findActiveUser(userId);
+
+        user.setUserName(newUserName);
+        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+    }
+
+    @Override
+    public void updatePhoneNumber(Long userId, String phoneNumber) {
+        User user = findActiveUser(userId);
+        String normalized = PhoneNumberUtil.normalize(phoneNumber);
+
+        if (normalized != null
+                && !normalized.equals(user.getPhoneNumber())
+                && userRepository.existsByPhoneNumber(normalized)) {
+            throw new DuplicatePhoneNumberException("이미 사용 중인 전화번호입니다.");
+        }
+
+        user.setPhoneNumber(normalized);
+        user.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+    }
+
+    // 전화번호 찾기시 이름, 전화번호가 충분한 인증인가 생각해보기
+    @Override
+    public String findMaskedEmail(String userName, String phoneNumber) {
+        String normalized = PhoneNumberUtil.normalize(phoneNumber);
+
+        User user = userRepository.findByUserNameAndPhoneNumber(userName, normalized)
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND_MESSAGE));
+
+        String email = user.getEmail();
+        if (!email.contains("@")) {
+            throw new InvalidEmailFormatException("올바르지 않은 이메일 형식입니다.");
+        }
+
+        int atIndex = email.indexOf('@');
+        String local = email.substring(0, atIndex);
+        String domain = email.substring(atIndex);
+
+        // 이메일이 1글자면 전체 마스킹
+        int visibleLength = local.length() == 1 ? 0 : Math.min(2, local.length() - 1);
+
+        // 2글자만 노출 그외 전부 마스킹
+        String visible = local.substring(0, visibleLength);
+        String masked = "*".repeat(local.length() - visibleLength);
+
+        return visible + masked + domain;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findExpiredWithdrawnUsers() {
+        return userRepository.findByStatusAndWithdrawnAtBefore(
+                Status.WITHDRAW, OffsetDateTime.now(ZoneOffset.UTC).minusDays(90));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findInactiveUsers() {
+        return userRepository.findByStatusAndLastLoginAtBefore(
+                Status.ACTIVE, OffsetDateTime.now(ZoneOffset.UTC).minusDays(30));
+    }
+
+    private User findActiveUser(Long userId) {
+        User user = getUserOrThrow(userId);
+        if (user.getStatus() != Status.ACTIVE) {
+            throw new InvalidUserStatusException("정상 상태의 계정이 아닙니다.");
+        }
+        return user;
+    }
+}

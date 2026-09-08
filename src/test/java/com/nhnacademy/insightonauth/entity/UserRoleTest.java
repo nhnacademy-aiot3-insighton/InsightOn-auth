@@ -1,0 +1,47 @@
+package com.nhnacademy.insightonauth.entity;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class UserRoleTest {
+
+    private User user;
+
+    @BeforeEach
+    void setUp() {
+        user = new User("test@test.com", "test", "01012345678");
+    }
+
+    @Test
+    @DisplayName("userRole 생성자 생성 성공")
+    void createUserRole() {
+        UserRole userRole = new UserRole(user, Role.MEMBER);
+
+        assertThat(userRole.getUser()).isEqualTo(user);
+        assertThat(userRole.getRole()).isEqualTo(Role.MEMBER);
+        assertThat(userRole.getCreatedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("모든 Role 값으로 userRole 생성 성공")
+    void createUserRole_withEachRole() {
+        for (Role role : Role.values()) {
+            UserRole userRole = new UserRole(user, role);
+            assertThat(userRole.getUser()).isEqualTo(user);
+            assertThat(userRole.getRole()).isEqualTo(role);
+            assertThat(userRole.getCreatedAt()).isNotNull();
+        }
+    }
+
+    @Test
+    @DisplayName("user가 null이면 NullPointerException")
+    void createUserRole_nullUser() {
+        assertThatThrownBy(() -> new UserRole(null, Role.MEMBER))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+}

@@ -1,0 +1,141 @@
+### ===============================
+### 1. 회원가입 / 인증 (UserController)
+### ===============================
+
+### 1-1. 이메일 중복 확인
+POST http://localhost:8080/api/v1/auth/check-email
+Content-Type: application/json
+
+{
+  "email": "test@example.com"
+}
+
+### 1-2. 이메일 인증코드 발송
+POST http://localhost:8080/api/v1/auth/email/verify-request
+Content-Type: application/json
+
+{
+  "email": "test@example.com"
+}
+
+### 1-3. 이메일 인증코드 확인
+POST http://localhost:8080/api/v1/auth/email/verify-confirm
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "code": "470545"
+}
+
+### 1-4. 회원가입
+POST http://localhost:8080/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test1234!",
+  "userName": "홍길동",
+  "phoneNumber": "010-1234-5678",
+  "token": "token"
+}
+
+### 1-5. 로그인
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test1234!"
+}
+
+### 1-6. 로그아웃
+POST http://localhost:8080/api/v1/auth/logout
+X-User-Id: 1
+
+### 1-7. 이메일 찾기
+POST http://localhost:8080/api/v1/auth/find-email
+Content-Type: application/json
+
+{
+  "userName": "홍길동",
+  "phoneNumber": "010-1234-5678"
+}
+
+### 1-8. 비밀번호 재설정 요청
+POST http://localhost:8080/api/v1/auth/password/reset-request
+Content-Type: application/json
+
+{
+  "email": "test@example.com"
+}
+
+### 1-9. 비밀번호 재설정 확인
+POST http://localhost:8080/api/v1/auth/password/reset-confirm
+Content-Type: application/json
+
+{
+  "token": "token",
+  "password": "NewPassword1234!"
+}
+
+### 1-10. 로그인
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "NewPassword1234!"
+}
+
+
+### ===============================
+### 2. 휴면/탈퇴 복구 (UserController)
+### ===============================
+
+### 2-1. 탈퇴 복구
+POST http://localhost:8080/api/v1/auth/reactive
+Content-Type: application/json
+
+{
+  "reactiveToken": "여기에_reactiveToken_입력"
+}
+
+### 2-2. 휴면 해제 - 인증코드 요청
+POST http://localhost:8080/api/v1/auth/reactivate/email-verify-request
+Content-Type: application/json
+
+{
+  "email": "test@example.com"
+}
+
+### 2-3. 휴면 해제 - 인증코드 확인
+POST http://localhost:8080/api/v1/auth/reactivate/email-verify-confirm
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "code": "123456"
+}
+
+
+### ===============================
+### 3. OAuth 로그인 (UserController)
+### ===============================
+
+### 3-1. Google OAuth 로그인
+POST http://localhost:8080/api/v1/auth/oauth/google
+Content-Type: application/json
+
+{
+  "code": "여기에_google_authorization_code_입력"
+}
+
+
+### ===============================
+### 4. 토큰 재발급 (UserController)
+### ===============================
+
+### 4-1. Access Token 재발급 (쿠키 기반)
+POST http://localhost:8080/api/v1/auth/refresh
+X-User-Id: 1
+Cookie: refreshToken=eyJraWQiOiJtb25pdG9yaW5nLWtleS12MSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiIxIiwianRpIjoiYTU5NmEwODItZDhiNi00YjA0LWFjYWQtZGRjMzQyYThjZGEzIiwiaWF0IjoxNzg1OTEwNTU3LCJleHAiOjE3ODcxMjAxNTd9.ROYtHcMc5ha15ixwC5jzlLnxr2JGYkpRaADkZR-ef58Qf0gTA7LoSA8f6f6y8M9Qv4S_eWvG5nX73IRXj78roIRuDeKg0NOm6hjDL5xvKBc-SQnu4i3sEn6vZHAmqnx_m8FOAcIP-IrzqlHa5ZRFYm1dICjHc1FlBTql7WaGCO4HKpTg3sXoCxR6zKzmo0ZlHi1nok-zAdo5IQpbG6xpOpRBTUxjKfdoZo_auedA56d9pkr-S4QafaeSkrq2WkBQd4kT8mfar6r7oHghaYg42RQF3lqI6P3VJOLoFcHPQzZRXqoz7cmjkbUhR57ohBDuQPr-J81jTPY1nWz2qKymEA
